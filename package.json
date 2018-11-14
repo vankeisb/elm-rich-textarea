@@ -1,7 +1,7 @@
 {
-  "name": "elm-textarea",
+  "name": "elm-rich-textarea",
   "version": "1.0.0",
-  "description": "foo bar",
+  "description": "utilities for building the app",
   "scripts": {
     "build": "elm make src/Main.elm --output=elm.js",
     "test": "elm-test",
