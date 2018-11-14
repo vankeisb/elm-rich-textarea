@@ -16,6 +16,7 @@ import Browser
 import Json.Decode as Json
 import Range exposing (Range)
 import Styles exposing (..)
+import Json.Encode as Encode
 
 
 
@@ -84,6 +85,11 @@ view lift renderer (Model d) =
                                     )
                             )
                     )
+
+        (ss, se) =
+            d.selection
+                |> Maybe.map Range.getBounds
+                |> Maybe.withDefault (0,0)
     in
     div
         []
@@ -98,25 +104,42 @@ view lift renderer (Model d) =
             textarea
                 [ value d.text
                 , id textareaId
+                , property "selectionStart" <| Encode.int ss
+                , property "selectionEnd" <| Encode.int se
                 , on "input" <|
                     Json.map3 OnInput
                         (Json.at [ "target", "value" ] Json.string)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
-                , on "keydown" <| keyDecoder OnKeyDown
-                , on "keyup" <| keyDecoder OnKeyUp
+                , custom "keydown" <|
+                    Json.map3
+                        (\keyCode start end ->
+                            { message = OnKeyDown keyCode start end
+                            , preventDefault =
+                                keyCode == 9 -- stop tab
+                            , stopPropagation =
+                                keyCode == 9 -- stop tab
+                            }
+                        )
+                        (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "target", "selectionStart" ] Json.int)
+                        (Json.at [ "target", "selectionEnd" ] Json.int)
+                , custom "keyup" <|
+                    Json.map3
+                        (\keyCode start end ->
+                            { message = OnKeyUp keyCode start end
+                            , preventDefault =
+                                keyCode == 9 -- stop tab
+                            , stopPropagation =
+                                keyCode == 9 -- stop tab
+                            }
+                        )
+                        (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "target", "selectionStart" ] Json.int)
+                        (Json.at [ "target", "selectionEnd" ] Json.int)
                 ]
                 []
         ]
-
-
-keyDecoder : (Int -> Int -> Int -> Msg) -> Json.Decoder Msg
-keyDecoder msg =
-    Json.map3 msg
-        (Json.at [ "keyCode" ] Json.int)
-        (Json.at [ "target", "selectionStart" ] Json.int)
-        (Json.at [ "target", "selectionEnd" ] Json.int)
-
 
 
 type alias Highlighter s = String -> List (Range, s)
@@ -180,25 +203,59 @@ update hl msg (Model model) =
                 |> noCmd
 
         OnKeyDown keyCode start end ->
-            onKey hl keyCode start end model
+            onKey True hl keyCode start end model
 
         OnKeyUp keyCode start end ->
-            onKey hl keyCode start end model
+            onKey False hl keyCode start end model
 
         NoOp ->
             (Model model, Cmd.none)
 
 
 
-onKey : Highlighter s -> Int -> Int -> Int -> ModelData s -> (Model s, Cmd Msg)
-onKey hl keyCode start end d =
+onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> (Model s, Cmd Msg)
+onKey isDown hl keyCode start end d =
+    let
+        (newText, newSel) =
+            if keyCode == 9 && not isDown then
+                -- TAB: insert spaces
+                d.selection
+                    |> Maybe.map
+                        (\r ->
+                            let
+                                (from, to) =
+                                    Range.getBounds r
+
+                                left =
+                                    String.slice 0 from d.text
+
+                                right =
+                                    String.slice to (String.length d.text) d.text
+                            in
+                                ( left ++ "  " ++ right
+                                , Just <| Range.move 2 r
+                                )
+                        )
+                    |> Maybe.withDefault
+                        ( d.text, d.selection )
+            else
+                ( d.text
+                , Just <| Range.range start end
+                )
+    in
     Model
         { d
             | selection =
-                Just (Range.range start end)
+                newSel
+                    |> Debug.log "newSel"
+            , text =
+                newText
         }
         |> computeStyles hl
         |> noCmd
+
+
+
 
 
 

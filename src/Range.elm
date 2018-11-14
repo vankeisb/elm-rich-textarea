@@ -5,6 +5,7 @@ module Range exposing
     , getBounds
     , getFrom
     , isCaret
+    , move
     )
 
 
@@ -40,3 +41,9 @@ getFrom (Range from _) =
 isCaret : Int -> Range -> Bool
 isCaret i (Range from to) =
     (from == to) && (from == i)
+
+
+
+move : Int -> Range -> Range
+move i (Range from to) =
+    Range (from + i) (to + i)

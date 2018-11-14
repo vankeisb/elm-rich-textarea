@@ -79,7 +79,7 @@ renderer myStyles =
 highlighter text =
     let
         stylify style word =
-            String.indexes word (Debug.log "text" text)
+            String.indexes word text
                 |> List.map
                     (\i ->
                         ( Range.range i (i + (String.length word))
