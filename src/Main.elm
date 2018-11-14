@@ -32,7 +32,7 @@ init : (Model, Cmd Msg)
 init =
     let
         (m, c) =
-            Textarea.init
+            Textarea.init "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m }
     , Cmd.map TextareaMsg c
@@ -49,7 +49,7 @@ view model =
             [ text "This is a textarea... with style ! "]
         , Textarea.view
             TextareaMsg
-            (Textarea.attributedRenderer renderer)
+            (Textarea.attributedRenderer TextareaMsg renderer)
             model.textareaModel
         ]
 

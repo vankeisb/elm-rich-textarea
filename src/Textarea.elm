@@ -17,7 +17,8 @@ import Json.Decode as Json
 import Range exposing (Range)
 import Styles exposing (..)
 import Json.Encode as Encode
-
+import Browser.Dom as Dom
+import Task
 
 
 type alias ModelData s =
@@ -36,20 +37,22 @@ type Msg
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
+    | MouseDown Int Float Int
     | NoOp
 
 
-init : (Model s, Cmd Msg)
-init =
+init : String -> (Model s, Cmd Msg)
+init s =
     (
         Model
-            { text = "initial text"
+            { text = s
             , selection = Nothing
             , styles = Styles.empty
             , styledTexts = []
             }
             |> computeStyledTexts
-    , Cmd.none
+    , Dom.focus textareaId
+        |> Task.attempt (\_ -> NoOp)
     )
 
 
@@ -208,6 +211,26 @@ update hl msg (Model model) =
         OnKeyUp keyCode start end ->
             onKey False hl keyCode start end model
 
+        MouseDown i offsetX clientWidth ->
+            -- place caret at index i or i+1, depending
+            -- on the location of the click inside the
+            -- char wrapper
+            let
+                index =
+                    if offsetX < ((toFloat clientWidth) / 2) then
+                        i
+                    else
+                        i + 1
+            in
+            ( Model
+                { model
+                    | selection =
+                        Just <| Range.range index index
+                }
+            , Dom.focus textareaId
+                |> Task.attempt (\_ -> NoOp)
+            )
+
         NoOp ->
             (Model model, Cmd.none)
 
@@ -275,8 +298,8 @@ addStyles styles (Model d) =
 
 
 
-attributedRenderer : (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer attrsSupplier str from selRange styles =
+attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
+attributedRenderer lift attrsSupplier str from selRange styles =
     let
         dataFrom f =
             attribute "data-from" <| (String.fromInt f)
@@ -304,6 +327,17 @@ attributedRenderer attrsSupplier str from selRange styles =
                 [ dataFrom <| from + i
                 , style "display" "inline-block"
                 , style "position" "relative"
+                , custom "mousedown" <|
+                    Json.map2
+                        (\offsetX w ->
+                            { message = lift (MouseDown (from + i) offsetX w)
+                            , preventDefault = True
+                            , stopPropagation = True
+                            }
+                        )
+                        (Json.at [ "offsetX" ] Json.float)
+                        (Json.at [ "target", "clientWidth" ] Json.int)
+
                 ] ++
                     (
                         if isSelected then
