@@ -19,6 +19,7 @@ import Styles exposing (..)
 import Json.Encode as Encode
 import Browser.Dom as Dom
 import Task
+import Array
 
 
 type alias ModelData s =
@@ -38,11 +39,13 @@ type Msg
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
     | MouseDown Int Float Int
+    | BackgroundClicked
+    | LineClicked Int
     | NoOp
 
 
-init : String -> (Model s, Cmd Msg)
-init s =
+init : Highlighter s -> String -> (Model s, Cmd Msg)
+init hl s =
     (
         Model
             { text = s
@@ -50,7 +53,7 @@ init s =
             , styles = Styles.empty
             , styledTexts = []
             }
-            |> computeStyledTexts
+            |> computeStyles hl
     , Dom.focus textareaId
         |> Task.attempt (\_ -> NoOp)
     )
@@ -73,10 +76,16 @@ view lift renderer (Model d) =
     let
         lines =
             d.styledTexts
-                |> List.map
-                    (\lineElems ->
+                |> List.indexedMap
+                    (\lineNumber lineElems ->
                         div
-                            []
+                            [ custom "mousedown" <|
+                                Json.succeed
+                                    { message = lift (LineClicked lineNumber)
+                                    , preventDefault = True
+                                    , stopPropagation = True
+                                    }
+                            ]
                             ( lineElems
                                 |> List.map
                                     (\e ->
@@ -101,6 +110,12 @@ view lift renderer (Model d) =
             , style "height" "200px"
             , style "width" "500px"
             , style "white-space" "pre"
+            , custom "mousedown" <|
+                Json.succeed
+                    { message = lift BackgroundClicked
+                    , preventDefault = True
+                    , stopPropagation = True
+                    }
             ]
             lines
         , Html.map lift <|
@@ -194,6 +209,7 @@ noCmd m =
 update : Highlighter s -> Msg -> Model s -> (Model s, Cmd Msg)
 update hl msg (Model model) =
     case Debug.log "msg" msg of
+
         OnInput s start end ->
             Model
                 { model
@@ -215,24 +231,65 @@ update hl msg (Model model) =
             -- place caret at index i or i+1, depending
             -- on the location of the click inside the
             -- char wrapper
-            let
-                index =
+            setCaretPos
+                (
                     if offsetX < ((toFloat clientWidth) / 2) then
                         i
                     else
                         i + 1
+                )
+                (Model model)
+
+        BackgroundClicked ->
+            -- place caret at the end of the text
+            setCaretPos
+                (String.length model.text)
+                (Model model)
+
+        LineClicked lineIndex ->
+            -- place caret at the end of the line
+            let
+                lineSize =
+                    String.split "\n" model.text
+                        |> List.map String.length
+                        |> List.foldl
+                            (\len (total, res) ->
+                                let
+                                    newTotal = len + total + 1
+                                in
+                                ( newTotal, res ++ [ newTotal ])
+
+                            )
+                            (0, [])
+                        |> Tuple.second
+                        |> Array.fromList
+                        |> Array.get lineIndex
+                        |> Debug.log "lineSize"
             in
-            ( Model
-                { model
-                    | selection =
-                        Just <| Range.range index index
-                }
-            , Dom.focus textareaId
-                |> Task.attempt (\_ -> NoOp)
-            )
+            lineSize
+                |> Maybe.map
+                    (\s ->
+                        setCaretPos (s - 1) (Model model)
+                    )
+                |> Maybe.withDefault
+                    (Model model, Cmd.none)
 
         NoOp ->
             (Model model, Cmd.none)
+
+
+
+setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
+setCaretPos i (Model d) =
+    ( Model
+        { d
+            | selection =
+                Just <| Range.range i i
+        }
+    , Dom.focus textareaId
+        |> Task.attempt (\_ -> NoOp)
+    )
+
 
 
 

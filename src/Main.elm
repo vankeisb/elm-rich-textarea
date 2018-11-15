@@ -32,7 +32,7 @@ init : (Model, Cmd Msg)
 init =
     let
         (m, c) =
-            Textarea.init "let\n  foo = 1\nin\n  foo + bar"
+            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m }
     , Cmd.map TextareaMsg c
