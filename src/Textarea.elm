@@ -20,6 +20,7 @@ import Json.Encode as Encode
 import Browser.Dom as Dom
 import Task
 import Array
+import Time exposing (Posix)
 
 
 type alias ModelData s =
@@ -28,6 +29,7 @@ type alias ModelData s =
     , styles: Styles s
     , styledTexts: List (List (StyledText s))
     , focused: Bool
+    , blinkDisplayCaret: Bool
     }
 
 
@@ -44,6 +46,7 @@ type Msg
     | LineClicked Int
     | Focused (Result Dom.Error ())
     | Blurred
+    | OnTime Posix
 
 
 init : Highlighter s -> String -> (Model s, Cmd Msg)
@@ -55,6 +58,7 @@ init hl s =
             , styles = Styles.empty
             , styledTexts = []
             , focused = False
+            , blinkDisplayCaret = True
             }
             |> computeStyles hl
     , focusTextarea
@@ -75,7 +79,7 @@ textareaId =
     Applies styles to a string at a given offset. Selection
     range is also passed for drawing the selection.
 -}
-type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> List s -> Html m
+type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
 
 
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
@@ -101,6 +105,7 @@ view lift renderer (Model d) =
                                             (Range.getFrom e.range)
                                             d.selection
                                             d.focused
+                                            d.blinkDisplayCaret
                                             e.styles
                                     )
                             )
@@ -288,6 +293,7 @@ update hl msg (Model model) =
             ( Model
                 { model
                     | focused = True
+                    , blinkDisplayCaret = True
                 }
             , Cmd.none
             )
@@ -300,6 +306,15 @@ update hl msg (Model model) =
             ( Model
                 { model
                     | focused = False
+                }
+            , Cmd.none
+            )
+
+        OnTime posix ->
+            ( Model
+                { model
+                    | blinkDisplayCaret =
+                        not model.blinkDisplayCaret
                 }
             , Cmd.none
             )
@@ -361,11 +376,12 @@ onKey isDown hl keyCode start end d =
 
 
 
-
-
 subscriptions : Model s -> Sub Msg
-subscriptions model =
-    Sub.none
+subscriptions (Model model) =
+    if model.focused then
+        Time.every 500 OnTime
+    else
+        Sub.none
 
 
 
@@ -380,7 +396,7 @@ addStyles styles (Model d) =
 
 
 attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer lift attrsSupplier str from selRange focused styles =
+attributedRenderer lift attrsSupplier str from selRange focused blinkDisplayCaret styles =
     let
         dataFrom f =
             attribute "data-from" <| (String.fromInt f)
@@ -396,7 +412,7 @@ attributedRenderer lift attrsSupplier str from selRange focused styles =
                             |> Maybe.map
                                 (\r ->
                                     ( Range.contains (from + i) r
-                                    , Range.isCaret (from + i) r
+                                    , blinkDisplayCaret && Range.isCaret (from + i) r
                                     )
                                 )
                             |> Maybe.withDefault

@@ -134,15 +134,18 @@ update msg model =
             (model, Cmd.none)
 
 
+subscriptions: Model -> Sub Msg
+subscriptions model =
+    Sub.map TextareaMsg <|
+        Textarea.subscriptions model.textareaModel
+
 main =
     Browser.element
         { init =
             \() ->
                 init
         , update = update
-        , subscriptions =
-            \_ ->
-                Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
 
