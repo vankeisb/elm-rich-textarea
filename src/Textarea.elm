@@ -29,7 +29,8 @@ type alias ModelData s =
     , styles: Styles s
     , styledTexts: List (List (StyledText s))
     , focused: Bool
-    , blinkDisplayCaret: Bool
+    , time: Posix
+    , blinkStart: Posix
     }
 
 
@@ -47,6 +48,7 @@ type Msg
     | Focused (Result Dom.Error ())
     | Blurred
     | OnTime Posix
+    | TriggerBlink Posix
 
 
 init : Highlighter s -> String -> (Model s, Cmd Msg)
@@ -58,7 +60,8 @@ init hl s =
             , styles = Styles.empty
             , styledTexts = []
             , focused = False
-            , blinkDisplayCaret = True
+            , time = Time.millisToPosix 0
+            , blinkStart = Time.millisToPosix 0
             }
             |> computeStyles hl
     , focusTextarea
@@ -85,6 +88,21 @@ type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> Bool -> List s
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
+        time =
+            Time.posixToMillis d.time
+
+        blinkStart =
+            Time.posixToMillis d.blinkStart
+
+        elapsed =
+            time - blinkStart
+
+        displayCaret =
+            if elapsed < 500 then
+                True
+            else
+                (modBy 2 (elapsed // 700)) == 0
+
         lines =
             d.styledTexts
                 |> List.indexedMap
@@ -105,7 +123,7 @@ view lift renderer (Model d) =
                                             (Range.getFrom e.range)
                                             d.selection
                                             d.focused
-                                            d.blinkDisplayCaret
+                                            displayCaret
                                             e.styles
                                     )
                             )
@@ -223,7 +241,7 @@ noCmd m =
 
 update : Highlighter s -> Msg -> Model s -> (Model s, Cmd Msg)
 update hl msg (Model model) =
-    case Debug.log "msg" msg of
+    case msg of
 
         OnInput s start end ->
             Model
@@ -279,7 +297,6 @@ update hl msg (Model model) =
                         |> Tuple.second
                         |> Array.fromList
                         |> Array.get lineIndex
-                        |> Debug.log "lineSize"
             in
             lineSize
                 |> Maybe.map
@@ -290,13 +307,12 @@ update hl msg (Model model) =
                     (Model model, Cmd.none)
 
         Focused (Ok ()) ->
-            ( Model
+            Model
                 { model
                     | focused = True
-                    , blinkDisplayCaret = True
                 }
-            , Cmd.none
-            )
+                |> triggerBlink
+
 
         Focused (Err _) ->
             (Model model, Cmd.none)
@@ -313,11 +329,35 @@ update hl msg (Model model) =
         OnTime posix ->
             ( Model
                 { model
-                    | blinkDisplayCaret =
-                        not model.blinkDisplayCaret
+                    | time =
+                        posix
                 }
             , Cmd.none
             )
+
+        TriggerBlink posix ->
+            ( Model
+                { model
+                    | time =
+                        posix
+                    , blinkStart =
+                        posix
+                }
+            , Cmd.none
+            )
+
+
+triggerBlink : Model s -> (Model s, Cmd Msg)
+triggerBlink (Model m) =
+    ( Model
+        { m
+            | time =
+                Time.millisToPosix 0
+            , blinkStart =
+                Time.millisToPosix 0
+        }
+    , Task.perform TriggerBlink Time.now
+    )
 
 
 setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
@@ -366,20 +406,29 @@ onKey isDown hl keyCode start end d =
         { d
             | selection =
                 newSel
-                    |> Debug.log "newSel"
             , text =
                 newText
         }
         |> computeStyles hl
-        |> noCmd
+        |> triggerBlink
 
 
 
 
 subscriptions : Model s -> Sub Msg
 subscriptions (Model model) =
-    if model.focused then
-        Time.every 500 OnTime
+    let
+        isCaretSelection =
+            model.selection
+                |> Maybe.map Range.getBounds
+                |> Maybe.map
+                    (\(from,to) ->
+                        from == to
+                    )
+                |> Maybe.withDefault False
+    in
+    if model.focused  && isCaretSelection then
+        Time.every 100 OnTime
     else
         Sub.none
 

@@ -67,18 +67,12 @@ type alias StyledText s =
 applyToText : String -> Int -> Styles s -> List (StyledText s)
 applyToText s offset styles =
     let
---        x1 =
---            Debug.log "styles" styles
-
         handleChar : String -> String -> Int -> Int -> List s -> List (StyledText s) -> List (StyledText s)
         handleChar str buf index startIndex curStyles res =
             let
                 -- get styles at current index
                 newStyles =
                     getStylesAt index styles
-
---                x2 =
---                    Debug.log "x2" ((str, buf), (index, startIndex), (newStyles, styles))
 
                 mkRange =
                     Range.range startIndex (startIndex + (String.length buf))
