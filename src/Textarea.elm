@@ -27,6 +27,7 @@ type alias ModelData s =
     , selection: Maybe Range
     , styles: Styles s
     , styledTexts: List (List (StyledText s))
+    , focused: Bool
     }
 
 
@@ -41,7 +42,8 @@ type Msg
     | MouseDown Int Float Int
     | BackgroundClicked
     | LineClicked Int
-    | NoOp
+    | Focused (Result Dom.Error ())
+    | Blurred
 
 
 init : Highlighter s -> String -> (Model s, Cmd Msg)
@@ -52,11 +54,16 @@ init hl s =
             , selection = Nothing
             , styles = Styles.empty
             , styledTexts = []
+            , focused = False
             }
             |> computeStyles hl
-    , Dom.focus textareaId
-        |> Task.attempt (\_ -> NoOp)
+    , focusTextarea
     )
+
+
+focusTextarea =
+    Dom.focus textareaId
+            |> Task.attempt Focused
 
 
 textareaId =
@@ -68,7 +75,7 @@ textareaId =
     Applies styles to a string at a given offset. Selection
     range is also passed for drawing the selection.
 -}
-type alias Renderer s m = String -> Int -> Maybe Range -> List s -> Html m
+type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> List s -> Html m
 
 
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
@@ -93,6 +100,7 @@ view lift renderer (Model d) =
                                             e.text
                                             (Range.getFrom e.range)
                                             d.selection
+                                            d.focused
                                             e.styles
                                     )
                             )
@@ -155,6 +163,8 @@ view lift renderer (Model d) =
                         (Json.at [ "keyCode" ] Json.int)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
+                , on "blur" <|
+                    Json.succeed Blurred
                 ]
                 []
         ]
@@ -274,9 +284,25 @@ update hl msg (Model model) =
                 |> Maybe.withDefault
                     (Model model, Cmd.none)
 
-        NoOp ->
+        Focused (Ok ()) ->
+            ( Model
+                { model
+                    | focused = True
+                }
+            , Cmd.none
+            )
+
+        Focused (Err _) ->
             (Model model, Cmd.none)
 
+
+        Blurred ->
+            ( Model
+                { model
+                    | focused = False
+                }
+            , Cmd.none
+            )
 
 
 setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
@@ -286,10 +312,8 @@ setCaretPos i (Model d) =
             | selection =
                 Just <| Range.range i i
         }
-    , Dom.focus textareaId
-        |> Task.attempt (\_ -> NoOp)
+    , focusTextarea
     )
-
 
 
 
@@ -356,7 +380,7 @@ addStyles styles (Model d) =
 
 
 attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer lift attrsSupplier str from selRange styles =
+attributedRenderer lift attrsSupplier str from selRange focused styles =
     let
         dataFrom f =
             attribute "data-from" <| (String.fromInt f)
@@ -367,17 +391,20 @@ attributedRenderer lift attrsSupplier str from selRange styles =
         charAttrs i =
             let
                 (isSelected, isCaretLeft) =
-                    selRange
-                        |> Maybe.map
-                            (\r ->
-                                ( Range.contains (from + i) r
-                                , Range.isCaret (from + i) r
+                    if focused then
+                        selRange
+                            |> Maybe.map
+                                (\r ->
+                                    ( Range.contains (from + i) r
+                                    , Range.isCaret (from + i) r
+                                    )
                                 )
-                            )
-                        |> Maybe.withDefault
-                            ( False
-                            , False
-                            )
+                            |> Maybe.withDefault
+                                ( False
+                                , False
+                                )
+                    else
+                        ( False, False )
 
             in
             (
