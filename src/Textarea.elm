@@ -137,10 +137,13 @@ view lift renderer (Model d) =
     div
         []
         [ div
-            [ style "border" "1px solid black"
-            , style "height" "200px"
-            , style "width" "500px"
+            [ style "position" "absolute"
+            , style "top" "0"
+            , style "left" "0"
+            , style "right" "0"
+            , style "bottom" "0"
             , style "white-space" "pre"
+            , style "overflow" "auto"
             , custom "mousedown" <|
                 Json.succeed
                     { message = lift BackgroundClicked

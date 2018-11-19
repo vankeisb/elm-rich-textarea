@@ -31,7 +31,7 @@ init : (Model, Cmd Msg)
 init =
     let
         (m, c) =
-            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
+            Textarea.init highlighter "let\n  foo =² 1\nin\n  foo + bar"
     in
     ( { textareaModel = m }
     , Cmd.map TextareaMsg c
@@ -46,10 +46,17 @@ view model =
         [ h1
             []
             [ text "This is a textarea... with style ! "]
-        , Textarea.view
-            TextareaMsg
-            (Textarea.attributedRenderer TextareaMsg renderer)
-            model.textareaModel
+        , div
+            [ style "width" "500px"
+            , style "height" "100px"
+            , style "position" "relative"
+            , style "border" "1px solid lightgray"
+            ]
+            [ Textarea.view
+                TextareaMsg
+                (Textarea.attributedRenderer TextareaMsg renderer)
+                model.textareaModel
+            ]
         ]
 
 
