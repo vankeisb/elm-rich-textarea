@@ -28,7 +28,7 @@ type MyStyle
 
 expectStylesAt index expected styles =
     \_ ->
-        Expect.equal
+        Expect.equalLists
             expected
             ( getStylesAt index styles )
 
@@ -75,13 +75,13 @@ suite =
         , describe "styled text"
             [ test "no styles" <|
                 \_ ->
-                    Expect.equal
+                    Expect.equalLists
                         [ StyledText myStr (range 0 10) [] ]
                         ( Styles.applyToText myStr 0 Styles.empty )
 
             , test "single style, width = 1" <|
                 \_ ->
-                    Expect.equal
+                    Expect.equalLists
                         [ StyledText "0" (range 0 1) []
                         , StyledText "1" (range 1 2) [ MyStyle1 ]
                         , StyledText "23456789" (range 2 10) []
@@ -89,7 +89,7 @@ suite =
                         (Styles.applyToText myStr 0 testStyle12)
             , test "single style, width = 2" <|
                 \_ ->
-                    Expect.equal
+                    Expect.equalLists
                         [ StyledText "0" (range 0 1) []
                         , StyledText "12" (range 1 3) [ MyStyle1 ]
                         , StyledText "3456789" (range 3 10) []
@@ -97,10 +97,10 @@ suite =
                         (Styles.applyToText myStr 0 testStyle13)
             , test "second line, width = 2" <|
                 \_ ->
-                    Expect.equal
+                    Expect.equalLists
                         [ StyledText "0" (range 10 11) []
                         , StyledText "12" (range 11 13) [ MyStyle1 ]
-                        , StyledText "3456789" (range 13 20) []
+                        , StyledText "3456789" (range 13 220) []
                         ]
                         ( Styles.fromList
                             [ (range 11 13, MyStyle1) ]
