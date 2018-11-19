@@ -100,7 +100,7 @@ suite =
                     Expect.equalLists
                         [ StyledText "0" (range 10 11) []
                         , StyledText "12" (range 11 13) [ MyStyle1 ]
-                        , StyledText "3456789" (range 13 220) []
+                        , StyledText "3456789" (range 13 20) []
                         ]
                         ( Styles.fromList
                             [ (range 11 13, MyStyle1) ]
