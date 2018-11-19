@@ -64,7 +64,7 @@ init hl s =
             , blinkStart = Time.millisToPosix 0
             }
             |> computeStyles hl
-    , focusTextarea
+    , Cmd.none
     )
 
 
