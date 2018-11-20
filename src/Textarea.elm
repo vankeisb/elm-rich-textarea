@@ -17,7 +17,10 @@ import Json.Decode as Json
 import Range exposing (Range)
 import Styles exposing (..)
 import Json.Encode as Encode
-
+import Browser.Dom as Dom
+import Task
+import Array
+import Time exposing (Posix)
 
 
 type alias ModelData s =
@@ -25,6 +28,9 @@ type alias ModelData s =
     , selection: Maybe Range
     , styles: Styles s
     , styledTexts: List (List (StyledText s))
+    , focused: Bool
+    , time: Posix
+    , blinkStart: Posix
     }
 
 
@@ -36,21 +42,35 @@ type Msg
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
-    | NoOp
+    | MouseDown Int Float Int
+    | BackgroundClicked
+    | LineClicked Int
+    | Focused (Result Dom.Error ())
+    | Blurred
+    | OnTime Posix
+    | TriggerBlink Posix
 
 
-init : (Model s, Cmd Msg)
-init =
+init : Highlighter s -> String -> (Model s, Cmd Msg)
+init hl s =
     (
         Model
-            { text = "initial text"
+            { text = s
             , selection = Nothing
             , styles = Styles.empty
             , styledTexts = []
+            , focused = False
+            , time = Time.millisToPosix 0
+            , blinkStart = Time.millisToPosix 0
             }
-            |> computeStyledTexts
+            |> computeStyles hl
     , Cmd.none
     )
+
+
+focusTextarea =
+    Dom.focus textareaId
+            |> Task.attempt Focused
 
 
 textareaId =
@@ -62,18 +82,39 @@ textareaId =
     Applies styles to a string at a given offset. Selection
     range is also passed for drawing the selection.
 -}
-type alias Renderer s m = String -> Int -> Maybe Range -> List s -> Html m
+type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
 
 
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
+        time =
+            Time.posixToMillis d.time
+
+        blinkStart =
+            Time.posixToMillis d.blinkStart
+
+        elapsed =
+            time - blinkStart
+
+        displayCaret =
+            if elapsed < 500 then
+                True
+            else
+                (modBy 2 (elapsed // 700)) == 0
+
         lines =
             d.styledTexts
-                |> List.map
-                    (\lineElems ->
+                |> List.indexedMap
+                    (\lineNumber lineElems ->
                         div
-                            []
+                            [ custom "mousedown" <|
+                                Json.succeed
+                                    { message = lift (LineClicked lineNumber)
+                                    , preventDefault = True
+                                    , stopPropagation = True
+                                    }
+                            ]
                             ( lineElems
                                 |> List.map
                                     (\e ->
@@ -81,6 +122,8 @@ view lift renderer (Model d) =
                                             e.text
                                             (Range.getFrom e.range)
                                             d.selection
+                                            d.focused
+                                            displayCaret
                                             e.styles
                                     )
                             )
@@ -98,12 +141,21 @@ view lift renderer (Model d) =
             , style "height" "200px"
             , style "width" "500px"
             , style "white-space" "pre"
+            , custom "mousedown" <|
+                Json.succeed
+                    { message = lift BackgroundClicked
+                    , preventDefault = True
+                    , stopPropagation = True
+                    }
             ]
             lines
         , Html.map lift <|
             textarea
                 [ value d.text
                 , id textareaId
+                , style "position" "fixed"
+                , style "left" "10000px"
+                , style "right" "10000px"
                 , property "selectionStart" <| Encode.int ss
                 , property "selectionEnd" <| Encode.int se
                 , on "input" <|
@@ -137,6 +189,8 @@ view lift renderer (Model d) =
                         (Json.at [ "keyCode" ] Json.int)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
+                , on "blur" <|
+                    Json.succeed Blurred
                 ]
                 []
         ]
@@ -190,7 +244,8 @@ noCmd m =
 
 update : Highlighter s -> Msg -> Model s -> (Model s, Cmd Msg)
 update hl msg (Model model) =
-    case Debug.log "msg" msg of
+    case msg of
+
         OnInput s start end ->
             Model
                 { model
@@ -208,8 +263,115 @@ update hl msg (Model model) =
         OnKeyUp keyCode start end ->
             onKey False hl keyCode start end model
 
-        NoOp ->
+        MouseDown i offsetX clientWidth ->
+            -- place caret at index i or i+1, depending
+            -- on the location of the click inside the
+            -- char wrapper
+            setCaretPos
+                (
+                    if offsetX < ((toFloat clientWidth) / 2) then
+                        i
+                    else
+                        i + 1
+                )
+                (Model model)
+
+        BackgroundClicked ->
+            -- place caret at the end of the text
+            setCaretPos
+                (String.length model.text)
+                (Model model)
+
+        LineClicked lineIndex ->
+            -- place caret at the end of the line
+            let
+                lineSize =
+                    String.split "\n" model.text
+                        |> List.map String.length
+                        |> List.foldl
+                            (\len (total, res) ->
+                                let
+                                    newTotal = len + total + 1
+                                in
+                                ( newTotal, res ++ [ newTotal ])
+
+                            )
+                            (0, [])
+                        |> Tuple.second
+                        |> Array.fromList
+                        |> Array.get lineIndex
+            in
+            lineSize
+                |> Maybe.map
+                    (\s ->
+                        setCaretPos (s - 1) (Model model)
+                    )
+                |> Maybe.withDefault
+                    (Model model, Cmd.none)
+
+        Focused (Ok ()) ->
+            Model
+                { model
+                    | focused = True
+                }
+                |> triggerBlink
+
+
+        Focused (Err _) ->
             (Model model, Cmd.none)
+
+
+        Blurred ->
+            ( Model
+                { model
+                    | focused = False
+                }
+            , Cmd.none
+            )
+
+        OnTime posix ->
+            ( Model
+                { model
+                    | time =
+                        posix
+                }
+            , Cmd.none
+            )
+
+        TriggerBlink posix ->
+            ( Model
+                { model
+                    | time =
+                        posix
+                    , blinkStart =
+                        posix
+                }
+            , Cmd.none
+            )
+
+
+triggerBlink : Model s -> (Model s, Cmd Msg)
+triggerBlink (Model m) =
+    ( Model
+        { m
+            | time =
+                Time.millisToPosix 0
+            , blinkStart =
+                Time.millisToPosix 0
+        }
+    , Task.perform TriggerBlink Time.now
+    )
+
+
+setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
+setCaretPos i (Model d) =
+    ( Model
+        { d
+            | selection =
+                Just <| Range.range i i
+        }
+    , focusTextarea
+    )
 
 
 
@@ -247,21 +409,31 @@ onKey isDown hl keyCode start end d =
         { d
             | selection =
                 newSel
-                    |> Debug.log "newSel"
             , text =
                 newText
         }
         |> computeStyles hl
-        |> noCmd
-
-
+        |> triggerBlink
 
 
 
 
 subscriptions : Model s -> Sub Msg
-subscriptions model =
-    Sub.none
+subscriptions (Model model) =
+    let
+        isCaretSelection =
+            model.selection
+                |> Maybe.map Range.getBounds
+                |> Maybe.map
+                    (\(from,to) ->
+                        from == to
+                    )
+                |> Maybe.withDefault False
+    in
+    if model.focused  && isCaretSelection then
+        Time.every 100 OnTime
+    else
+        Sub.none
 
 
 
@@ -275,8 +447,8 @@ addStyles styles (Model d) =
 
 
 
-attributedRenderer : (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer attrsSupplier str from selRange styles =
+attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
+attributedRenderer lift attrsSupplier str from selRange focused blinkDisplayCaret styles =
     let
         dataFrom f =
             attribute "data-from" <| (String.fromInt f)
@@ -287,23 +459,37 @@ attributedRenderer attrsSupplier str from selRange styles =
         charAttrs i =
             let
                 (isSelected, isCaretLeft) =
-                    selRange
-                        |> Maybe.map
-                            (\r ->
-                                ( Range.contains (from + i) r
-                                , Range.isCaret (from + i) r
+                    if focused then
+                        selRange
+                            |> Maybe.map
+                                (\r ->
+                                    ( Range.contains (from + i) r
+                                    , blinkDisplayCaret && Range.isCaret (from + i) r
+                                    )
                                 )
-                            )
-                        |> Maybe.withDefault
-                            ( False
-                            , False
-                            )
+                            |> Maybe.withDefault
+                                ( False
+                                , False
+                                )
+                    else
+                        ( False, False )
 
             in
             (
                 [ dataFrom <| from + i
                 , style "display" "inline-block"
                 , style "position" "relative"
+                , custom "mousedown" <|
+                    Json.map2
+                        (\offsetX w ->
+                            { message = lift (MouseDown (from + i) offsetX w)
+                            , preventDefault = True
+                            , stopPropagation = True
+                            }
+                        )
+                        (Json.at [ "offsetX" ] Json.float)
+                        (Json.at [ "target", "clientWidth" ] Json.int)
+
                 ] ++
                     (
                         if isSelected then

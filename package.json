@@ -1,9 +1,9 @@
 {
-  "name": "elm-textarea",
+  "name": "elm-rich-textarea",
   "version": "1.0.0",
-  "description": "foo bar",
+  "description": "utilities for building the app",
   "scripts": {
-    "build": "elm make src/Main.elm --output=elm.js",
+    "build": "elm make src/Main.elm --output=docs/elm.js",
     "test": "elm-test",
     "format": "elm-format --yes src",
     "watch": "chokidar 'src/**/*.elm' -c 'elm make src/Main.elm --output elm.js --debug' --initial"

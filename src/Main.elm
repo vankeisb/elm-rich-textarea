@@ -27,12 +27,11 @@ type alias Model =
     }
 
 
-
 init : (Model, Cmd Msg)
 init =
     let
         (m, c) =
-            Textarea.init
+            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m }
     , Cmd.map TextareaMsg c
@@ -49,7 +48,7 @@ view model =
             [ text "This is a textarea... with style ! "]
         , Textarea.view
             TextareaMsg
-            (Textarea.attributedRenderer renderer)
+            (Textarea.attributedRenderer TextareaMsg renderer)
             model.textareaModel
         ]
 
@@ -135,15 +134,18 @@ update msg model =
             (model, Cmd.none)
 
 
+subscriptions: Model -> Sub Msg
+subscriptions model =
+    Sub.map TextareaMsg <|
+        Textarea.subscriptions model.textareaModel
+
 main =
     Browser.element
         { init =
             \() ->
                 init
         , update = update
-        , subscriptions =
-            \_ ->
-                Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
 
