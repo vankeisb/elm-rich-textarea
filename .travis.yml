@@ -1,0 +1,8 @@
+language: node_js # elm is installed from npm (see install below)
+node_js: node     # use "latest" version of Node.js
+
+install: # install specific versions of elm & elm-test
+- npm install
+
+script:
+- npm run build
