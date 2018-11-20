@@ -2,7 +2,7 @@ language: node_js # elm is installed from npm (see install below)
 node_js: node     # use "latest" version of Node.js
 
 env:
-- ELM_VERSION=0.18.0 ELM_TEST=0.18.12
+- ELM_VERSION=0.19.0 ELM_TEST=0.19.0-beta12
 
 install: # install specific versions of elm & elm-test
 - npm install -g elm@$ELM_VERSION elm-test@$ELM_TEST
