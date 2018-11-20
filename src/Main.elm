@@ -24,16 +24,21 @@ type MyStyle
 
 type alias Model =
     { textareaModel: Textarea.Model MyStyle
+    , idPrefix: String
     }
 
 
-init : (Model, Cmd Msg)
-init =
+
+init : String -> (Model, Cmd Msg)
+init idPrefix =
     let
         (m, c) =
-            Textarea.init highlighter "let\n  foo =² 1\nin\n  foo + bar"
+            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
     in
-    ( { textareaModel = m }
+    (
+        { textareaModel = m
+        , idPrefix = idPrefix
+        }
     , Cmd.map TextareaMsg c
     )
 
@@ -150,7 +155,7 @@ main =
     Browser.element
         { init =
             \() ->
-                init
+                init "my-textarea"
         , update = update
         , subscriptions = subscriptions
         , view = view

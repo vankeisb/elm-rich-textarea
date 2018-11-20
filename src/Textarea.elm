@@ -157,8 +157,8 @@ view lift renderer (Model d) =
                 [ value d.text
                 , id textareaId
                 , style "position" "fixed"
-                , style "left" "10000px"
-                , style "right" "10000px"
+                , style "left" "-10000px"
+                , style "top" "-10000px"
                 , property "selectionStart" <| Encode.int ss
                 , property "selectionEnd" <| Encode.int se
                 , on "input" <|
