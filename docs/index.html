@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>elm-textarea</title>
-    <style type="text/css">
-        body {
-            font-family: sans-serif;
-        }
-    </style>
+    <title>elm-rich-textarea</title>
+    <script src="elm.js"></script>
 </head>
 <body>
-Test
+<div id="app"></div>
+<script>
+    Elm.Main.init({node: document.getElementById("app")});
+</script>
 </body>
 </html>
