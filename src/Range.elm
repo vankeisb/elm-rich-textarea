@@ -1,6 +1,7 @@
 module Range exposing
     ( Range
     , contains
+    , expand
     , getBounds
     , getFrom
     , isCaret
@@ -41,3 +42,12 @@ isCaret i (Range from to) =
 move : Int -> Range -> Range
 move i (Range from to) =
     Range (from + i) (to + i)
+
+
+expand : Int -> Range -> Range
+expand new (Range from to) =
+    if new > from then
+        Range from new
+
+    else
+        Range new to

@@ -30,6 +30,7 @@ type alias ModelData s =
     , focused : Bool
     , time : Posix
     , blinkStart : Posix
+    , selecting : Bool
     }
 
 
@@ -42,7 +43,11 @@ type Msg
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
     | MouseDown Int Float Int
+    | MouseUp Int
+    | MouseOver Int
+    | MouseOverLine Int
     | BackgroundClicked
+    | BackgroundMouseUp
     | LineClicked Int
     | Focused (Result Dom.Error ())
     | Blurred
@@ -60,6 +65,7 @@ init hl s =
         , focused = False
         , time = Time.millisToPosix 0
         , blinkStart = Time.millisToPosix 0
+        , selecting = False
         }
         |> computeStyles hl
     , Cmd.none
@@ -116,6 +122,7 @@ view lift renderer (Model d) =
                                     , preventDefault = True
                                     , stopPropagation = True
                                     }
+                            , onMouseOver <| lift <| MouseOverLine lineNumber
                             ]
                             (lineElems
                                 |> List.map
@@ -143,6 +150,7 @@ view lift renderer (Model d) =
             , style "height" "200px"
             , style "width" "500px"
             , style "white-space" "pre"
+            , onMouseUp <| lift BackgroundMouseUp
             , custom "mousedown" <|
                 Json.succeed
                     { message = lift BackgroundClicked
@@ -251,6 +259,24 @@ noCmd m =
     ( m, Cmd.none )
 
 
+lineSize : Int -> String -> Maybe Int
+lineSize n text =
+    String.split "\n" text
+        |> List.map String.length
+        |> List.foldl
+            (\len ( total, res ) ->
+                let
+                    newTotal =
+                        len + total + 1
+                in
+                ( newTotal, res ++ [ newTotal ] )
+            )
+            ( 0, [] )
+        |> Tuple.second
+        |> Array.fromList
+        |> Array.get n
+
+
 update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
 update hl msg (Model model) =
     case msg of
@@ -282,7 +308,35 @@ update hl msg (Model model) =
                  else
                     i + 1
                 )
-                (Model model)
+            <|
+                setSelecting True <|
+                    Model model
+
+        MouseUp i ->
+            ( Model model |> expandSelection i |> setSelecting False, Cmd.none )
+
+        MouseOver i ->
+            if model.selecting then
+                ( Model model |> expandSelection i, Cmd.none )
+
+            else
+                ( Model model, Cmd.none )
+
+        MouseOverLine n ->
+            if model.selecting then
+                let
+                    size =
+                        lineSize n model.text
+
+                    model1 =
+                        size
+                            |> Maybe.map (\s -> Model model |> expandSelection s)
+                            |> Maybe.withDefault (Model model)
+                in
+                ( model1, Cmd.none )
+
+            else
+                ( Model model, Cmd.none )
 
         BackgroundClicked ->
             -- place caret at the end of the text
@@ -290,29 +344,17 @@ update hl msg (Model model) =
                 (String.length model.text)
                 (Model model)
 
+        BackgroundMouseUp ->
+            ( Model model |> setSelecting False, Cmd.none )
+
         LineClicked lineIndex ->
             -- place caret at the end of the line
-            let
-                lineSize =
-                    String.split "\n" model.text
-                        |> List.map String.length
-                        |> List.foldl
-                            (\len ( total, res ) ->
-                                let
-                                    newTotal =
-                                        len + total + 1
-                                in
-                                ( newTotal, res ++ [ newTotal ] )
-                            )
-                            ( 0, [] )
-                        |> Tuple.second
-                        |> Array.fromList
-                        |> Array.get lineIndex
-            in
-            lineSize
+            lineSize lineIndex model.text
                 |> Maybe.map
                     (\s ->
-                        setCaretPos (s - 1) (Model model)
+                        setCaretPos (s - 1) <|
+                            setSelecting True <|
+                                Model model
                     )
                 |> Maybe.withDefault
                     ( Model model, Cmd.none )
@@ -378,6 +420,16 @@ setCaretPos i (Model d) =
         }
     , focusTextarea
     )
+
+
+setSelecting : Bool -> Model s -> Model s
+setSelecting toggle (Model d) =
+    Model { d | selecting = toggle }
+
+
+expandSelection : Int -> Model s -> Model s
+expandSelection to (Model d) =
+    Model { d | selection = Maybe.map (Range.expand to) d.selection }
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
@@ -481,6 +533,8 @@ attributedRenderer lift attrsSupplier str from selRange focused blinkDisplayCare
             ( [ dataFrom <| from + i
               , style "display" "inline-block"
               , style "position" "relative"
+              , onMouseUp <| lift (MouseUp <| from + i + 1)
+              , onMouseOver <| lift (MouseOver <| from + i + 1)
               , custom "mousedown" <|
                     Json.map2
                         (\offsetX w ->
