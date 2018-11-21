@@ -6,6 +6,7 @@ module Textarea exposing
     , update
     , subscriptions
     , attributedRenderer
+    , InitData
     )
 
 
@@ -24,7 +25,8 @@ import Time exposing (Posix)
 
 
 type alias ModelData s =
-    { text: String
+    { idPrefix: String
+    , text: String
     , selection: Maybe Range
     , styles: Styles s
     , styledTexts: List (List (StyledText s))
@@ -51,11 +53,19 @@ type Msg
     | TriggerBlink Posix
 
 
-init : Highlighter s -> String -> (Model s, Cmd Msg)
-init hl s =
+type alias InitData s =
+    { highlighter: Highlighter s
+    , initialText: String
+    , idPrefix: String
+    }
+
+
+init : InitData s -> (Model s, Cmd Msg)
+init initData =
     (
         Model
-            { text = s
+            { idPrefix = initData.idPrefix
+            , text = initData.initialText
             , selection = Nothing
             , styles = Styles.empty
             , styledTexts = []
@@ -63,18 +73,20 @@ init hl s =
             , time = Time.millisToPosix 0
             , blinkStart = Time.millisToPosix 0
             }
-            |> computeStyles hl
+            |> computeStyles initData.highlighter
     , Cmd.none
     )
 
 
-focusTextarea =
-    Dom.focus textareaId
+focusTextarea : ModelData s -> Cmd Msg
+focusTextarea d =
+    Dom.focus (textareaId d)
             |> Task.attempt Focused
 
 
-textareaId =
-    "elm-textarea"
+textareaId : ModelData s -> String
+textareaId d =
+    d.idPrefix ++ "-textarea"
 
 
 
@@ -155,7 +167,7 @@ view lift renderer (Model d) =
         , Html.map lift <|
             textarea
                 [ value d.text
-                , id textareaId
+                , id <| textareaId d
                 , style "position" "fixed"
                 , style "left" "-10000px"
                 , style "top" "-10000px"
@@ -373,7 +385,7 @@ setCaretPos i (Model d) =
             | selection =
                 Just <| Range.range i i
         }
-    , focusTextarea
+    , focusTextarea d
     )
 
 

@@ -24,7 +24,6 @@ type MyStyle
 
 type alias Model =
     { textareaModel: Textarea.Model MyStyle
-    , idPrefix: String
     }
 
 
@@ -33,11 +32,14 @@ init : String -> (Model, Cmd Msg)
 init idPrefix =
     let
         (m, c) =
-            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
+            Textarea.init
+                { idPrefix = "my-ta"
+                , highlighter = highlighter
+                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                }
     in
     (
         { textareaModel = m
-        , idPrefix = idPrefix
         }
     , Cmd.map TextareaMsg c
     )
