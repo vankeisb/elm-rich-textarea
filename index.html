@@ -8,6 +8,25 @@
         /*body {*/
             /*font-family: "Courier New", Courier, monospace*/
         /*}*/
+
+        .blinking-cursor1 {
+            opacity: 0;
+            animation: 1s blink step-end infinite;
+        }
+
+        .blinking-cursor2 {
+            opacity: 0;
+            animation: 1s blink step-end infinite;
+        }
+
+        @keyframes blink {
+          from, to {
+            opacity: 0;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
     </style>
 </head>
 <body>
