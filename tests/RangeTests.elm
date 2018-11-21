@@ -8,7 +8,13 @@ import Test exposing (..)
 suite : Test
 suite =
     describe "Range tests"
-        [ describe "expand"
+        [ describe "init (and normalize)"
+            [ test "normal" <|
+                \_ ->
+                    range 1 2
+                        |> Expect.equal (range 2 1)
+            ]
+        , describe "expand"
             [ test "to right" <|
                 \_ ->
                     range 1 2
@@ -18,6 +24,6 @@ suite =
                 \_ ->
                     range 13 20
                         |> expand 3
-                        |> Expect.equal (range 3 20)
+                        |> Expect.equal (range 3 13)
             ]
         ]
