@@ -76,7 +76,7 @@ textareaId =
 
 
 type alias Renderer s m =
-    String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
+    String -> Int -> Maybe Range -> List s -> Html m
 
 
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
@@ -101,8 +101,6 @@ view lift renderer (Model d) =
                                             e.text
                                             (Range.getFrom e.range)
                                             d.selection
-                                            d.focused
-                                            False
                                             e.styles
                                     )
                             )
@@ -383,7 +381,7 @@ addStyles styles (Model d) =
 
 
 attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer lift attrsSupplier str from selRange focused blinkClassToggle styles =
+attributedRenderer lift attrsSupplier str from selRange styles =
     let
         dataFrom f =
             attribute "data-from" <| String.fromInt f
@@ -394,21 +392,17 @@ attributedRenderer lift attrsSupplier str from selRange focused blinkClassToggle
         charAttrs i =
             let
                 ( isSelected, isCaretLeft ) =
-                    if True || focused then
-                        selRange
-                            |> Maybe.map
-                                (\r ->
-                                    ( Range.contains (from + i) r
-                                    , Range.isCaret (from + i) r
-                                    )
+                    selRange
+                        |> Maybe.map
+                            (\r ->
+                                ( Range.contains (from + i) r
+                                , Range.isCaret (from + i) r
                                 )
-                            |> Maybe.withDefault
-                                ( False
-                                , False
-                                )
-
-                    else
-                        ( False, False )
+                            )
+                        |> Maybe.withDefault
+                            ( False
+                            , False
+                            )
             in
             ( [ dataFrom <| from + i
               , style "display" "inline-block"
