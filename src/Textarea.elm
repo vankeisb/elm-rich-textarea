@@ -19,7 +19,6 @@ import Json.Encode as Encode
 import Range exposing (Range)
 import Styles exposing (..)
 import Task
-import Time exposing (Posix)
 
 
 type alias ModelData s =
@@ -28,7 +27,6 @@ type alias ModelData s =
     , styles : Styles s
     , styledTexts : List (List (StyledText s))
     , focused : Bool
-    , time : Posix
     }
 
 
@@ -55,7 +53,6 @@ init hl s =
         , styles = Styles.empty
         , styledTexts = []
         , focused = False
-        , time = Time.millisToPosix 0
         }
         |> computeStyles hl
     , Cmd.none
@@ -85,9 +82,6 @@ type alias Renderer s m =
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
-        time =
-            Time.posixToMillis d.time
-
         lines =
             d.styledTexts
                 |> List.indexedMap
