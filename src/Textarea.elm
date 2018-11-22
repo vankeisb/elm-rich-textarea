@@ -29,7 +29,6 @@ type alias ModelData s =
     , styledTexts : List (List (StyledText s))
     , focused : Bool
     , time : Posix
-    , blinkStart : Posix
     }
 
 
@@ -46,7 +45,6 @@ type Msg
     | LineClicked Int
     | Focused (Result Dom.Error ())
     | Blurred
-    | TriggerBlink Posix
 
 
 init : Highlighter s -> String -> ( Model s, Cmd Msg )
@@ -58,7 +56,6 @@ init hl s =
         , styledTexts = []
         , focused = False
         , time = Time.millisToPosix 0
-        , blinkStart = Time.millisToPosix 0
         }
         |> computeStyles hl
     , Cmd.none
@@ -90,19 +87,6 @@ view lift renderer (Model d) =
     let
         time =
             Time.posixToMillis d.time
-
-        blinkStart =
-            Time.posixToMillis d.blinkStart
-
-        elapsed =
-            time - blinkStart
-
-        displayCaret =
-            if elapsed < 500 then
-                True
-
-            else
-                modBy 2 (elapsed // 700) == 0
 
         lines =
             d.styledTexts
@@ -317,11 +301,12 @@ update hl msg (Model model) =
                     ( Model model, Cmd.none )
 
         Focused (Ok ()) ->
-            Model
+            ( Model
                 { model
                     | focused = True
                 }
-                |> triggerBlink
+            , Cmd.none
+            )
 
         Focused (Err _) ->
             ( Model model, Cmd.none )
@@ -333,30 +318,6 @@ update hl msg (Model model) =
                 }
             , Cmd.none
             )
-
-        TriggerBlink posix ->
-            ( Model
-                { model
-                    | time =
-                        posix
-                    , blinkStart =
-                        posix
-                }
-            , Cmd.none
-            )
-
-
-triggerBlink : Model s -> ( Model s, Cmd Msg )
-triggerBlink (Model m) =
-    ( Model
-        { m
-            | time =
-                Time.millisToPosix 0
-            , blinkStart =
-                Time.millisToPosix 0
-        }
-    , Task.perform TriggerBlink Time.now
-    )
 
 
 setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
@@ -401,7 +362,7 @@ onKey isDown hl keyCode start end d =
                 , Just <| Range.range start end
                 )
     in
-    Model
+    ( Model
         { d
             | selection =
                 newSel
@@ -409,7 +370,8 @@ onKey isDown hl keyCode start end d =
                 newText
         }
         |> computeStyles hl
-        |> triggerBlink
+    , Cmd.none
+    )
 
 
 subscriptions : Model s -> Sub Msg
