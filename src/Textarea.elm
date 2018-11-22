@@ -24,6 +24,12 @@ import Array
 import Time exposing (Posix)
 
 
+type alias Dimensions =
+    { h: Float
+    , w: Float
+    }
+
+
 type alias ModelData s =
     { idPrefix: String
     , text: String
@@ -33,11 +39,22 @@ type alias ModelData s =
     , focused: Bool
     , time: Posix
     , blinkStart: Posix
+    , viewportBox: Box
     }
 
 
 type Model s =
     Model (ModelData s)
+
+
+type alias Box =
+    { x : Float
+    , y : Float
+    , h : Float
+    , w : Float
+    , scrollTop: Float
+    , scrollLeft: Float
+    }
 
 
 type Msg
@@ -51,6 +68,12 @@ type Msg
     | Blurred
     | OnTime Posix
     | TriggerBlink Posix
+    | GetViewportPos (Result Dom.Error Dom.Element)
+    | GetViewport (Result Dom.Error Dom.Viewport)
+    | GetCharViewport (Result Dom.Error Dom.Element)
+    | Scrolled Float Float
+    | NoOp
+
 
 
 type alias InitData s =
@@ -62,8 +85,8 @@ type alias InitData s =
 
 init : InitData s -> (Model s, Cmd Msg)
 init initData =
-    (
-        Model
+    let
+        initialModelData =
             { idPrefix = initData.idPrefix
             , text = initData.initialText
             , selection = Nothing
@@ -72,10 +95,21 @@ init initData =
             , focused = False
             , time = Time.millisToPosix 0
             , blinkStart = Time.millisToPosix 0
+            , viewportBox =
+                { h = 0
+                , w = 0
+                , x = 0
+                , y = 0
+                , scrollTop = 0
+                , scrollLeft = 0
+                }
             }
-            |> computeStyles initData.highlighter
+    in
+    ( Model initialModelData
+        |> computeStyles initData.highlighter
     , Cmd.none
     )
+        |> getViewportPos
 
 
 focusTextarea : ModelData s -> Cmd Msg
@@ -90,11 +124,21 @@ textareaId d =
 
 
 
+viewportId : ModelData s -> String
+viewportId d =
+    d.idPrefix ++ "-viewport"
+
+
+charId : ModelData s -> Int -> String
+charId d i =
+    d.idPrefix ++ "-char-" ++ (String.fromInt i)
+
+
 {-
     Applies styles to a string at a given offset. Selection
     range is also passed for drawing the selection.
 -}
-type alias Renderer s m = String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
+type alias  Renderer s m = String -> String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
 
 
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
@@ -131,6 +175,7 @@ view lift renderer (Model d) =
                                 |> List.map
                                     (\e ->
                                         renderer
+                                            d.idPrefix
                                             e.text
                                             (Range.getFrom e.range)
                                             d.selection
@@ -147,7 +192,12 @@ view lift renderer (Model d) =
                 |> Maybe.withDefault (0,0)
     in
     div
-        []
+        [ style "position" "absolute"
+        , style "top" "0"
+        , style "left" "0"
+        , style "right" "0"
+        , style "bottom" "0"
+        ]
         [ div
             [ style "position" "absolute"
             , style "top" "0"
@@ -156,12 +206,20 @@ view lift renderer (Model d) =
             , style "bottom" "0"
             , style "white-space" "pre"
             , style "overflow" "auto"
+            , id <| viewportId d
             , custom "mousedown" <|
                 Json.succeed
                     { message = lift BackgroundClicked
                     , preventDefault = True
                     , stopPropagation = True
                     }
+            , on "scroll" <|
+                Json.map2
+                    (\left top ->
+                        lift <| Scrolled left top
+                    )
+                    (Json.at [ "target", "scrollLeft" ] Json.float)
+                    (Json.at [ "target", "scrollTop" ] Json.float)
             ]
             lines
         , Html.map lift <|
@@ -171,6 +229,8 @@ view lift renderer (Model d) =
                 , style "position" "fixed"
                 , style "left" "-10000px"
                 , style "top" "-10000px"
+--                , style "width" "400px"
+--                , style "height" "200px"
                 , property "selectionStart" <| Encode.int ss
                 , property "selectionEnd" <| Encode.int se
                 , on "input" <|
@@ -364,6 +424,125 @@ update hl msg (Model model) =
             , Cmd.none
             )
 
+        GetViewportPos element ->
+            case element of
+                Ok e ->
+                    let
+                        box =
+                            model.viewportBox
+                    in
+                    ( Model
+                        { model
+                            | viewportBox =
+                                { box
+                                    | x = e.element.x
+                                    , y = e.element.y
+                                }
+                        }
+                    , Cmd.none
+                    )
+                        |> getViewportSize
+
+                Err _ ->
+                    (Model model, Cmd.none)
+
+
+
+        GetViewport vp ->
+            ( case vp of
+                Ok v ->
+                    let
+                        box =
+                            model.viewportBox
+                    in
+                    Model
+                        { model
+                            | viewportBox =
+                                { box
+                                    | h =
+                                        v.viewport.height
+                                    , w =
+                                        v.viewport.width
+                                }
+                        }
+                Err _ ->
+                    Model model
+            , Cmd.none
+            )
+
+        GetCharViewport element ->
+            case element of
+                Ok e ->
+                    let
+                        scrollTop =
+                            model.viewportBox.scrollTop
+                                |> Debug.log "scrollTop"
+
+                        charTop =
+                            e.element.y
+
+                        charBottom =
+                            charTop + e.element.height
+
+                        viewportTop =
+                            model.viewportBox.y
+
+                        topDelta =
+                            viewportTop - charTop
+                                |> Debug.log "topDelta"
+
+                        viewportBottom =
+                            viewportTop + model.viewportBox.h
+
+                        bottomDelta =
+                            charBottom - viewportBottom
+
+                        scrollLeft =
+                            model.viewportBox.scrollLeft
+
+                        setScroll x y =
+                            Dom.setViewportOf
+                                (viewportId model)
+                                x
+                                y
+                                |> Task.attempt
+                                    (\_ -> NoOp)
+
+                        scrollV =
+                            if bottomDelta > 0 then
+                                setScroll scrollLeft (scrollTop + bottomDelta)
+                            else if topDelta > 0 then
+                                setScroll scrollLeft (scrollTop - topDelta)
+                            else
+                                Cmd.none
+                    in
+                    ( Model model
+                    , scrollV
+                    )
+                Err _ ->
+                    (Model model, Cmd.none)
+
+        Scrolled x y ->
+            let
+                box =
+                    model.viewportBox
+
+                newBox =
+                    { box
+                        | scrollTop = y
+                    }
+            in
+            ( Model
+                { model
+                    | viewportBox =
+                        newBox
+                }
+            , Cmd.none
+            )
+
+        NoOp ->
+            (Model model, Cmd.none)
+
 
 triggerBlink : Model s -> (Model s, Cmd Msg)
 triggerBlink (Model m) =
@@ -419,17 +598,75 @@ onKey isDown hl keyCode start end d =
                 ( d.text
                 , Just <| Range.range start end
                 )
-    in
-    Model
-        { d
-            | selection =
-                newSel
-            , text =
-                newText
-        }
-        |> computeStyles hl
-        |> triggerBlink
 
+        newData =
+            { d
+                | selection =
+                    newSel
+                , text =
+                    newText
+            }
+
+        res =
+            Model newData
+                |> computeStyles hl
+                |> triggerBlink
+                |> getViewportPos
+    in
+    if not isDown then
+        getCaretPos res
+    else
+        res
+
+
+
+getViewportPos : (Model s, Cmd Msg) -> (Model s, Cmd Msg)
+getViewportPos (Model d, c) =
+    ( Model d
+    , Cmd.batch
+        [ c
+        , Dom.getElement (viewportId d)
+            |> Task.attempt GetViewportPos
+        ]
+    )
+
+
+
+getViewportSize: (Model s, Cmd Msg) -> (Model s, Cmd Msg)
+getViewportSize (Model d, c) =
+    ( Model d
+    , Cmd.batch
+        [ c
+        , Dom.getViewportOf (viewportId d)
+            |> Task.attempt GetViewport
+        ]
+    )
+
+
+
+getCaretPos: (Model s, Cmd Msg) -> (Model s, Cmd Msg)
+getCaretPos (Model d, c) =
+    let
+        cmd =
+            d.selection
+                |> Maybe.map
+                    (\r ->
+                        if Range.isCaret (Range.getFrom r) r then
+                            Dom.getElement
+                                (charId d (Range.getFrom r))
+                                |> Task.attempt GetCharViewport
+                        else
+                            Cmd.none
+                    )
+                |> Maybe.withDefault Cmd.none
+
+    in
+    (Model d
+    , Cmd.batch
+        [ c
+        , cmd
+        ]
+    )
 
 
 
@@ -446,7 +683,8 @@ subscriptions (Model model) =
                 |> Maybe.withDefault False
     in
     if model.focused  && isCaretSelection then
-        Time.every 100 OnTime
+        Sub.none
+--        Time.every 100 OnTime
     else
         Sub.none
 
@@ -462,8 +700,8 @@ addStyles styles (Model d) =
 
 
 
-attributedRenderer : (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer lift attrsSupplier str from selRange focused blinkDisplayCaret styles =
+attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
+attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange focused blinkDisplayCaret styles =
     let
         dataFrom f =
             attribute "data-from" <| (String.fromInt f)
@@ -494,6 +732,7 @@ attributedRenderer lift attrsSupplier str from selRange focused blinkDisplayCare
                 [ dataFrom <| from + i
                 , style "display" "inline-block"
                 , style "position" "relative"
+                , id <| charId m (from + i)
                 , custom "mousedown" <|
                     Json.map2
                         (\offsetX w ->

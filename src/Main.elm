@@ -35,7 +35,8 @@ init idPrefix =
             Textarea.init
                 { idPrefix = "my-ta"
                 , highlighter = highlighter
-                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+--                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                , initialText = [ "aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh", "iii"] |> String.join "\n"
                 }
     in
     (
@@ -54,14 +55,14 @@ view model =
             []
             [ text "This is a textarea... with style ! "]
         , div
-            [ style "width" "500px"
-            , style "height" "100px"
+            [ style "width" "200px"
+            , style "height" "50px"
             , style "position" "relative"
             , style "border" "1px solid lightgray"
             ]
             [ Textarea.view
                 TextareaMsg
-                (Textarea.attributedRenderer TextareaMsg renderer)
+                (Textarea.attributedRenderer model.textareaModel TextareaMsg renderer)
                 model.textareaModel
             ]
         ]
