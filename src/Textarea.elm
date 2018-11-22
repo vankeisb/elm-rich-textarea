@@ -141,6 +141,11 @@ charId d i =
 type alias  Renderer s m = String -> String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
 
 
+-- used to display the textarea
+devMode =
+    False
+
+
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
@@ -170,6 +175,7 @@ view lift renderer (Model d) =
                                     , preventDefault = True
                                     , stopPropagation = True
                                     }
+                            , style "display" "flex"
                             ]
                             ( lineElems
                                 |> List.map
@@ -227,12 +233,22 @@ view lift renderer (Model d) =
                 [ value d.text
                 , id <| textareaId d
                 , style "position" "fixed"
-                , style "left" "-10000px"
-                , style "top" "-10000px"
---                , style "width" "400px"
---                , style "height" "200px"
+                , style "padding" "0"
+                , style "left" <|
+                    if devMode then
+                        "350px"
+                    else
+                        "-10000px"
+                , style "top" <|
+                    if devMode then
+                        "65px"
+                    else
+                        "-10000px"
+                , style "width" "200px"
+                , style "height" "100px"
                 , property "selectionStart" <| Encode.int ss
                 , property "selectionEnd" <| Encode.int se
+                , style "white-space" "nowrap"
                 , on "input" <|
                     Json.map3 OnInput
                         (Json.at [ "target", "value" ] Json.string)
@@ -476,7 +492,6 @@ update hl msg (Model model) =
                     let
                         scrollTop =
                             model.viewportBox.scrollTop
-                                |> Debug.log "scrollTop"
 
                         charTop =
                             e.element.y
@@ -489,7 +504,6 @@ update hl msg (Model model) =
 
                         topDelta =
                             viewportTop - charTop
-                                |> Debug.log "topDelta"
 
                         viewportBottom =
                             viewportTop + model.viewportBox.h
@@ -500,6 +514,24 @@ update hl msg (Model model) =
                         scrollLeft =
                             model.viewportBox.scrollLeft
 
+                        charLeft =
+                            e.element.x
+
+                        charRight =
+                            charLeft + e.element.width
+
+                        viewportLeft =
+                            model.viewportBox.x
+
+                        leftDelta =
+                            viewportLeft - charLeft
+
+                        viewportRight =
+                            viewportLeft + model.viewportBox.w
+
+                        rightDelta =
+                            charRight - viewportRight
+
                         setScroll x y =
                             Dom.setViewportOf
                                 (viewportId model)
@@ -508,16 +540,24 @@ update hl msg (Model model) =
                                 |> Task.attempt
                                     (\_ -> NoOp)
 
-                        scrollV =
+                        newScrollTop =
                             if bottomDelta > 0 then
-                                setScroll scrollLeft (scrollTop + bottomDelta)
+                                scrollTop + bottomDelta
                             else if topDelta > 0 then
-                                setScroll scrollLeft (scrollTop - topDelta)
+                                scrollTop - topDelta
                             else
-                                Cmd.none
+                                scrollTop
+
+                        newScrollLeft =
+                            if rightDelta > 0 then
+                                scrollLeft + rightDelta
+                            else if leftDelta > 0 then
+                                scrollLeft - leftDelta
+                            else
+                                scrollLeft
                     in
                     ( Model model
-                    , scrollV
+                    , setScroll newScrollLeft newScrollTop
                     )
                 Err _ ->
                     (Model model, Cmd.none)
@@ -530,6 +570,7 @@ update hl msg (Model model) =
                 newBox =
                     { box
                         | scrollTop = y
+                        , scrollLeft = x
                     }
             in
             ( Model
@@ -683,8 +724,7 @@ subscriptions (Model model) =
                 |> Maybe.withDefault False
     in
     if model.focused  && isCaretSelection then
-        Sub.none
---        Time.every 100 OnTime
+        Time.every 100 OnTime
     else
         Sub.none
 
