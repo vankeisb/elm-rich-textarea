@@ -333,6 +333,20 @@ noCmd m =
     (m, Cmd.none)
 
 
+
+setSelection : Maybe Range -> (Model s, Cmd Msg) -> (Model s, Cmd Msg)
+setSelection r (Model d, c) =
+    ( Model
+        { d
+            | selection =
+                r
+        }
+    , c
+    )
+        |> scrollCaretIntoView d.selection
+
+
+
 update : Highlighter s -> Msg -> Model s -> (Model s, Cmd Msg)
 update hl msg (Model model) =
     case msg of
@@ -342,11 +356,12 @@ update hl msg (Model model) =
                 { model
                     | text =
                         s
-                    , selection =
-                        Just (Range.range start end)
                 }
                 |> computeStyles hl
                 |> noCmd
+                |> setSelection
+                    (Just (Range.range start end))
+
 
         OnKeyDown keyCode start end ->
             onKey True hl keyCode start end model
@@ -600,14 +615,11 @@ triggerBlink (Model m) =
 
 setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
 setCaretPos i (Model d) =
-    ( Model
-        { d
-            | selection =
-                Just <| Range.range i i
-        }
+    ( Model d
     , focusTextarea d
     )
-
+        |> setSelection
+            (Just <| Range.range i i)
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> (Model s, Cmd Msg)
@@ -639,25 +651,16 @@ onKey isDown hl keyCode start end d =
                 ( d.text
                 , Just <| Range.range start end
                 )
-
-        newData =
-            { d
-                | selection =
-                    newSel
-                , text =
-                    newText
-            }
-
-        res =
-            Model newData
-                |> computeStyles hl
-                |> triggerBlink
-                |> getViewportPos
     in
-    if not isDown then
-        getCaretPos res
-    else
-        res
+    Model
+        { d
+            | text =
+                newText
+        }
+        |> computeStyles hl
+        |> triggerBlink
+        |> getViewportPos
+        |> setSelection newSel
 
 
 
@@ -685,19 +688,47 @@ getViewportSize (Model d, c) =
 
 
 
-getCaretPos: (Model s, Cmd Msg) -> (Model s, Cmd Msg)
-getCaretPos (Model d, c) =
+scrollCaretIntoView: Maybe Range -> (Model s, Cmd Msg) -> (Model s, Cmd Msg)
+scrollCaretIntoView prevRange (Model d, c) =
     let
+        scrollCmd charIndex =
+            Dom.getElement
+                (charId d charIndex)
+                |> Task.attempt GetCharViewport
+
         cmd =
             d.selection
                 |> Maybe.map
                     (\r ->
-                        if Range.isCaret (Range.getFrom r) r then
-                            Dom.getElement
-                                (charId d (Range.getFrom r))
-                                |> Task.attempt GetCharViewport
+                        let
+                            (newFrom, newTo) =
+                                Range.getBounds r
+                        in
+                        -- compare new selection with previous one
+                        -- and find the "caret" pos
+                        if newFrom == newTo then
+                            -- new range is a caret : we can get the charId
+                            scrollCmd (Range.getFrom r)
                         else
-                            Cmd.none
+                            -- we need to compare with the previous range and
+                            -- see how it "expanded"
+                            case prevRange of
+                                Just pr ->
+                                    let
+                                        (oldFrom, oldTo) =
+                                            Range.getBounds pr
+                                    in
+                                    if oldFrom == newFrom && oldTo /= newTo then
+                                        -- "right" expansion : use the right offset
+                                        scrollCmd newTo
+                                    else if oldFrom /= newFrom && oldTo == newTo then
+                                        -- "left" expansion : use the left offset
+                                        scrollCmd newFrom
+                                    else
+                                        Cmd.none
+
+                                Nothing ->
+                                    Cmd.none
                     )
                 |> Maybe.withDefault Cmd.none
 
