@@ -1,7 +1,6 @@
 module Range exposing
     ( Range
     , contains
-    , expand
     , getBounds
     , getFrom
     , isCaret
@@ -21,6 +20,7 @@ range from to =
 
     else
         Range to from
+
 
 contains : Int -> Range -> Bool
 contains index (Range from to) =
@@ -45,12 +45,3 @@ isCaret i (Range from to) =
 move : Int -> Range -> Range
 move i (Range from to) =
     Range (from + i) (to + i)
-
-
-expand : Int -> Range -> Range
-expand new (Range from to) =
-    if new > from then
-        Range from new
-
-    else
-        Range new from

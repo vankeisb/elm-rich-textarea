@@ -36,7 +36,7 @@ type alias ModelData s =
     , styledTexts : List (List (StyledText s))
     , focused : Bool
     , viewportBox : Box
-    , selecting : Bool
+    , selectingAt : Maybe Int
     }
 
 
@@ -62,7 +62,9 @@ type Msg
     | MouseUp Int
     | MouseOver Int
     | MouseOverLine Int
+    | MouseUpLine Int
     | BackgroundClicked
+    | BackgroundMouseOver
     | BackgroundMouseUp
     | LineClicked Int
     | Focused (Result Dom.Error ())
@@ -99,7 +101,7 @@ init initData =
                 , scrollTop = 0
                 , scrollLeft = 0
                 }
-            , selecting = False
+            , selectingAt = Nothing
             }
     in
     ( Model initialModelData
@@ -159,7 +161,8 @@ view lift renderer (Model d) =
                         div
                             [ style "display" "flex"
                             , mouseEvent "mousedown" (\_ -> lift <| LineClicked lineNumber)
-                            , mouseEvent "mouseup" (\_ -> lift <| MouseOverLine lineNumber)
+                            , mouseEvent "mouseover" (\_ -> lift <| MouseOverLine lineNumber)
+                            , mouseEvent "mouseup" (\_ -> lift <| MouseUpLine lineNumber)
                             ]
                             (lineElems
                                 |> List.map
@@ -195,8 +198,9 @@ view lift renderer (Model d) =
             , style "white-space" "pre"
             , style "overflow" "auto"
             , id <| viewportId d
-            , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , mouseEvent "mousedown" (\_ -> lift <| BackgroundClicked)
+            , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
+            , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -369,6 +373,15 @@ lineSize n text =
         |> Array.get n
 
 
+updateIfSelecting : (Model s -> Model s) -> Model s -> Model s
+updateIfSelecting fun (Model model) =
+    if model.selectingAt /= Nothing then
+        fun <| Model model
+
+    else
+        Model model
+
+
 update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
 update hl msg (Model model) =
     case msg of
@@ -393,30 +406,39 @@ update hl msg (Model model) =
             setCaretPos i (Model model)
 
         MouseUp i ->
-            ( Model model |> expandSelection i |> setSelecting False, Cmd.none )
+            ( Model model
+                |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
+            , Cmd.none
+            )
 
         MouseOver i ->
-            if model.selecting then
-                ( Model model |> expandSelection i, Cmd.none )
-
-            else
-                ( Model model, Cmd.none )
+            ( Model model
+                |> updateIfSelecting (expandSelection i)
+            , Cmd.none
+            )
 
         MouseOverLine n ->
-            if model.selecting then
-                let
-                    size =
-                        lineSize n model.text
+            ( Model model
+                |> updateIfSelecting
+                    (\(Model m) ->
+                        lineSize n m.text
+                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.withDefault (Model m)
+                    )
+            , Cmd.none
+            )
 
-                    model1 =
-                        size
-                            |> Maybe.map (\s -> Model model |> expandSelection s)
-                            |> Maybe.withDefault (Model model)
-                in
-                ( model1, Cmd.none )
-
-            else
-                ( Model model, Cmd.none )
+        MouseUpLine n ->
+            ( Model model
+                |> updateIfSelecting
+                    (\(Model m) ->
+                        lineSize n m.text
+                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.map (setSelectingAt Nothing)
+                            |> Maybe.withDefault (Model m)
+                    )
+            , Cmd.none
+            )
 
         BackgroundClicked ->
             -- place caret at the end of the text
@@ -424,8 +446,17 @@ update hl msg (Model model) =
                 (String.length model.text)
                 (Model model)
 
+        BackgroundMouseOver ->
+            ( Model model
+                |> updateIfSelecting (expandSelection <| String.length model.text)
+            , Cmd.none
+            )
+
         BackgroundMouseUp ->
-            ( Model model |> setSelecting False, Cmd.none )
+            ( Model model
+                |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
+            , Cmd.none
+            )
 
         LineClicked lineIndex ->
             -- place caret at the end of the line
@@ -453,6 +484,7 @@ update hl msg (Model model) =
                 { model
                     | focused = False
                 }
+                |> setSelectingAt Nothing
             , Cmd.none
             )
 
@@ -608,21 +640,21 @@ update hl msg (Model model) =
 setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
-        |> setSelecting True
+        |> setSelectingAt (Just i)
     , focusTextarea d
     )
         |> setSelection
             (Just <| Range.range i i)
 
 
-setSelecting : Bool -> Model s -> Model s
-setSelecting toggle (Model d) =
-    Model { d | selecting = toggle }
+setSelectingAt : Maybe Int -> Model s -> Model s
+setSelectingAt at (Model d) =
+    Model { d | selectingAt = at }
 
 
 expandSelection : Int -> Model s -> Model s
 expandSelection to (Model d) =
-    Model { d | selection = Maybe.map (Range.expand to) d.selection }
+    Model { d | selection = Maybe.map (Range.range to) d.selectingAt }
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
@@ -781,7 +813,7 @@ mouseEvent name createMsg =
 
 adjustIndex : Float -> Int -> Int
 adjustIndex offsetX clientWidth =
-    if offsetX >= (toFloat clientWidth / 2) then
+    if (Debug.log "FW1" <| offsetX) >= (Debug.log "FW2" <| (toFloat clientWidth * 0.5)) then
         1
 
     else
@@ -818,7 +850,7 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
               , id <| charId m (from + i)
               , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
               , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
-              , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + 1 + adjust)
+              , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
               ]
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]
