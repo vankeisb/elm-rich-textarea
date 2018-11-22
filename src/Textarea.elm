@@ -208,6 +208,25 @@ view lift renderer (Model d) =
                     (Json.at [ "target", "scrollTop" ] Json.float)
             ]
             lines
+        , node "style"
+            [ attribute "scoped" ""
+            ]
+            [ text """
+                    .blinking-cursor {
+                        opacity: 1;
+                        animation: 1s blink step-end infinite;
+                    }
+
+                    @keyframes blink {
+                      from, to {
+                        opacity: 1;
+                      }
+                      50% {
+                        opacity: 0;
+                      }
+                    }
+        """
+            ]
         , Html.map lift <|
             textarea
                 [ value d.text
@@ -780,6 +799,7 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
                                 , style "bottom" "0"
                                 , style "width" "0px"
                                 , style "box-sizing" "border-box"
+                                , class "blinking-cursor"
                                 ]
                                 []
 
