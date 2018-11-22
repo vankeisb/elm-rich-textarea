@@ -308,9 +308,7 @@ update hl msg (Model model) =
                  else
                     i + 1
                 )
-            <|
-                setSelecting True <|
-                    Model model
+                (Model model)
 
         MouseUp i ->
             ( Model model |> expandSelection i |> setSelecting False, Cmd.none )
@@ -352,9 +350,7 @@ update hl msg (Model model) =
             lineSize lineIndex model.text
                 |> Maybe.map
                     (\s ->
-                        setCaretPos (s - 1) <|
-                            setSelecting True <|
-                                Model model
+                        setCaretPos (s - 1) (Model model)
                     )
                 |> Maybe.withDefault
                     ( Model model, Cmd.none )
@@ -418,6 +414,7 @@ setCaretPos i (Model d) =
             | selection =
                 Just <| Range.range i i
         }
+        |> setSelecting True
     , focusTextarea
     )
 
