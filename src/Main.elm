@@ -54,8 +54,8 @@ view model =
             []
             [ text "This is a textarea... with style ! "]
         , div
-            [ style "width" "200px"
-            , style "height" "100px"
+            [ style "width" "400px"
+            , style "height" "200px"
             , style "position" "relative"
             , style "border" "1px solid lightgray"
             ]
