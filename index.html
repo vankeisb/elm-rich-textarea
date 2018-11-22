@@ -9,22 +9,17 @@
             /*font-family: "Courier New", Courier, monospace*/
         /*}*/
 
-        .blinking-cursor1 {
-            opacity: 0;
-            animation: 1s blink step-end infinite;
-        }
-
-        .blinking-cursor2 {
-            opacity: 0;
+        .blinking-cursor {
+            opacity: 1;
             animation: 1s blink step-end infinite;
         }
 
         @keyframes blink {
           from, to {
-            opacity: 0;
+            opacity: 1;
           }
           50% {
-            opacity: 1;
+            opacity: 0;
           }
         }
     </style>

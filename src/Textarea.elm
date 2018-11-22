@@ -30,7 +30,6 @@ type alias ModelData s =
     , focused : Bool
     , time : Posix
     , blinkStart : Posix
-    , blinkClassToggle : Bool
     }
 
 
@@ -60,7 +59,6 @@ init hl s =
         , focused = False
         , time = Time.millisToPosix 0
         , blinkStart = Time.millisToPosix 0
-        , blinkClassToggle = False
         }
         |> computeStyles hl
     , Cmd.none
@@ -126,7 +124,7 @@ view lift renderer (Model d) =
                                             (Range.getFrom e.range)
                                             d.selection
                                             d.focused
-                                            d.blinkClassToggle
+                                            False
                                             e.styles
                                     )
                             )
@@ -357,7 +355,6 @@ triggerBlink (Model m) =
             , blinkStart =
                 Time.millisToPosix 0
         }
-        |> resetBlink
     , Task.perform TriggerBlink Time.now
     )
 
@@ -369,17 +366,8 @@ setCaretPos i (Model d) =
             | selection =
                 Just <| Range.range i i
         }
-        |> resetBlink
     , focusTextarea
     )
-
-
-resetBlink : Model s -> Model s
-resetBlink (Model d) =
-    Model
-        { d
-            | blinkClassToggle = not d.blinkClassToggle
-        }
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
@@ -498,14 +486,6 @@ attributedRenderer lift attrsSupplier str from selRange focused blinkClassToggle
                     let
                         ( ca, isCaretLeft ) =
                             charAttrs i
-
-                        -- TODO do NOT define in index.html
-                        blinkClass =
-                            if blinkClassToggle then
-                                "blinking-cursor1"
-
-                            else
-                                "blinking-cursor2"
                     in
                     div
                         ca
@@ -518,7 +498,7 @@ attributedRenderer lift attrsSupplier str from selRange focused blinkClassToggle
                                 , style "bottom" "0"
                                 , style "width" "0px"
                                 , style "box-sizing" "border-box"
-                                , class blinkClass
+                                , class "blinking-cursor" -- TODO do NOT define in index.html
                                 ]
                                 []
 
