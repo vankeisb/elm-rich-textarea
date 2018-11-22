@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "description": "utilities for building the app",
   "scripts": {
-    "build": "elm-test && elm make examples/src/Main.elm --output=docs/index.html",
+    "build": "elm-test && elm make src/Main.elm --output=docs/index.html",
     "test": "elm-test",
-    "format": "elm-format --yes src"
+    "format": "elm-format --yes src",
+    "watch": "chokidar 'src/**/*.elm' -c 'elm make src/Main.elm --output elm.js --debug' --initial"
   },
   "devDependencies": {
+    "chokidar-cli": "^1.2.1",
     "elm": "^0.19.0-bugfix2 ",
     "elm-format": "^0.8.0",
     "elm-test": "^0.19.0-beta12"
