@@ -2,7 +2,5 @@ elm-stuff
 .idea
 *.iml
 node_modules
-
 elm.js
-
 yarn*

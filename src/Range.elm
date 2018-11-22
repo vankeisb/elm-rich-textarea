@@ -22,7 +22,6 @@ range from to =
     else
         Range to from
 
-
 contains : Int -> Range -> Bool
 contains index (Range from to) =
     (index >= from) && (index < to)

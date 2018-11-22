@@ -24,13 +24,18 @@ type alias Model =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : String -> ( Model, Cmd Msg )
+init idPrefix =
     let
         ( m, c ) =
-            Textarea.init highlighter "let\n  foo = 1\nin\n  foo + bar"
+            Textarea.init
+                { idPrefix = "my-ta"
+                , highlighter = highlighter
+                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                }
     in
-    ( { textareaModel = m }
+    ( { textareaModel = m
+      }
     , Cmd.map TextareaMsg c
     )
 
@@ -42,10 +47,17 @@ view model =
         [ h1
             []
             [ text "This is a textarea... with style ! " ]
-        , Textarea.view
-            TextareaMsg
-            (Textarea.attributedRenderer TextareaMsg renderer)
-            model.textareaModel
+        , div
+            [ style "width" "400px"
+            , style "height" "200px"
+            , style "position" "relative"
+            , style "border" "1px solid lightgray"
+            ]
+            [ Textarea.view
+                TextareaMsg
+                (Textarea.attributedRenderer model.textareaModel TextareaMsg renderer)
+                model.textareaModel
+            ]
         ]
 
 
@@ -134,7 +146,7 @@ main =
     Browser.element
         { init =
             \() ->
-                init
+                init "my-textarea"
         , update = update
         , subscriptions = subscriptions
         , view = view
