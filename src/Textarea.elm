@@ -20,6 +20,8 @@ import Json.Encode as Encode
 import Range exposing (Range)
 import Styles exposing (..)
 import Task
+import Array
+import Time exposing (Posix)
 
 
 type alias Dimensions =
@@ -141,7 +143,6 @@ charId d i =
 
 type alias Renderer s m =
     String -> String -> Int -> Maybe Range -> List s -> Html m
-
 
 
 -- used to display the textarea
