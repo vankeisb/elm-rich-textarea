@@ -813,7 +813,7 @@ mouseEvent name createMsg =
 
 adjustIndex : Float -> Int -> Int
 adjustIndex offsetX clientWidth =
-    if (Debug.log "FW1" <| offsetX) >= (Debug.log "FW2" <| (toFloat clientWidth * 0.5)) then
+    if offsetX >= (toFloat clientWidth * 0.5) then
         1
 
     else
