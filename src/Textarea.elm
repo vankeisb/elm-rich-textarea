@@ -37,7 +37,8 @@ type alias ModelData s =
     , styles : Styles s
     , styledTexts : List (List (StyledText s))
     , focused : Bool
-    ,  viewportBox : Box
+    , viewportBox : Box
+    , selectingAt : Maybe Int
     }
 
 
@@ -59,8 +60,14 @@ type Msg
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
-    | MouseDown Int Float Int
+    | MouseDown Int
+    | MouseUp Int
+    | MouseOver Int
+    | MouseOverLine Int
+    | MouseUpLine Int
     | BackgroundClicked
+    | BackgroundMouseOver
+    | BackgroundMouseUp
     | LineClicked Int
     | Focused (Result Dom.Error ())
     | Blurred
@@ -96,6 +103,7 @@ init initData =
                 , scrollTop = 0
                 , scrollLeft = 0
                 }
+            , selectingAt = Nothing
             }
     in
     ( Model initialModelData
@@ -152,13 +160,10 @@ view lift renderer (Model d) =
                 |> List.indexedMap
                     (\lineNumber lineElems ->
                         div
-                            [ custom "mousedown" <|
-                                Json.succeed
-                                    { message = lift (LineClicked lineNumber)
-                                    , preventDefault = True
-                                    , stopPropagation = True
-                                    }
-                            , style "display" "flex"
+                            [ style "display" "flex"
+                            , mouseEvent "mousedown" (\_ -> lift <| LineClicked lineNumber)
+                            , mouseEvent "mouseover" (\_ -> lift <| MouseOverLine lineNumber)
+                            , mouseEvent "mouseup" (\_ -> lift <| MouseUpLine lineNumber)
                             ]
                             (lineElems
                                 |> List.map
@@ -194,12 +199,9 @@ view lift renderer (Model d) =
             , style "white-space" "pre"
             , style "overflow" "auto"
             , id <| viewportId d
-            , custom "mousedown" <|
-                Json.succeed
-                    { message = lift BackgroundClicked
-                    , preventDefault = True
-                    , stopPropagation = True
-                    }
+            , mouseEvent "mousedown" (\_ -> lift <| BackgroundClicked)
+            , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
+            , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -354,6 +356,35 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
+lineSize : Int -> String -> Maybe Int
+lineSize n text =
+    String.split "\n" text
+        |> List.map String.length
+        |> List.foldl
+            (\len ( total, res ) ->
+                let
+                    newTotal =
+                        len + total + 1
+                in
+                ( newTotal, res ++ [ newTotal ] )
+            )
+            ( 0, [] )
+        |> Tuple.second
+        |> Array.fromList
+        |> Array.get n
+
+
+updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+updateIfSelecting fun ( Model model, c ) =
+    if model.selectingAt /= Nothing then
+        ( Model model, c )
+            |> Tuple.mapFirst fun
+            |> scrollCaretIntoView model.selection
+
+    else
+        ( Model model, c )
+
+
 update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
 update hl msg (Model model) =
     case msg of
@@ -374,18 +405,43 @@ update hl msg (Model model) =
         OnKeyUp keyCode start end ->
             onKey False hl keyCode start end model
 
-        MouseDown i offsetX clientWidth ->
-            -- place caret at index i or i+1, depending
-            -- on the location of the click inside the
-            -- char wrapper
-            setCaretPos
-                (if offsetX < (toFloat clientWidth / 2) then
-                    i
+        MouseDown i ->
+            setCaretPos i (Model model)
 
-                 else
-                    i + 1
-                )
-                (Model model)
+        MouseUp i ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
+
+        MouseOver i ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting (expandSelection i)
+
+        MouseOverLine n ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting
+                    (\(Model m) ->
+                        lineSize n m.text
+                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.withDefault (Model m)
+                    )
+
+        MouseUpLine n ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting
+                    (\(Model m) ->
+                        lineSize n m.text
+                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.map (setSelectingAt Nothing)
+                            |> Maybe.withDefault (Model m)
+                    )
 
         BackgroundClicked ->
             -- place caret at the end of the text
@@ -393,26 +449,21 @@ update hl msg (Model model) =
                 (String.length model.text)
                 (Model model)
 
+        BackgroundMouseOver ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting (expandSelection <| String.length model.text)
+
+        BackgroundMouseUp ->
+            ( Model model
+            , Cmd.none
+            )
+                |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
+
         LineClicked lineIndex ->
             -- place caret at the end of the line
-            let
-                lineSize =
-                    String.split "\n" model.text
-                        |> List.map String.length
-                        |> List.foldl
-                            (\len ( total, res ) ->
-                                let
-                                    newTotal =
-                                        len + total + 1
-                                in
-                                ( newTotal, res ++ [ newTotal ] )
-                            )
-                            ( 0, [] )
-                        |> Tuple.second
-                        |> Array.fromList
-                        |> Array.get lineIndex
-            in
-            lineSize
+            lineSize lineIndex model.text
                 |> Maybe.map
                     (\s ->
                         setCaretPos (s - 1) (Model model)
@@ -436,6 +487,7 @@ update hl msg (Model model) =
                 { model
                     | focused = False
                 }
+                |> setSelectingAt Nothing
             , Cmd.none
             )
 
@@ -591,10 +643,21 @@ update hl msg (Model model) =
 setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
+        |> setSelectingAt (Just i)
     , focusTextarea d
     )
         |> setSelection
             (Just <| Range.range i i)
+
+
+setSelectingAt : Maybe Int -> Model s -> Model s
+setSelectingAt at (Model d) =
+    Model { d | selectingAt = at }
+
+
+expandSelection : Int -> Model s -> Model s
+expandSelection to (Model d) =
+    Model { d | selection = Maybe.map (Range.range to) d.selectingAt }
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
@@ -731,6 +794,35 @@ addStyles styles (Model d) =
         }
 
 
+mouseEvent : String -> (Int -> m) -> Attribute m
+mouseEvent name createMsg =
+    custom name <|
+        Json.map2
+            (\offsetX w ->
+                { message = createMsg (adjustIndex offsetX w)
+                , preventDefault = True
+                , stopPropagation = True
+                }
+            )
+            (Json.at [ "offsetX" ] Json.float)
+            (Json.at [ "target", "clientWidth" ] Json.int)
+
+
+
+-- place caret at index i or i+1, depending
+-- on the location of the click inside the
+-- char wrapper
+
+
+adjustIndex : Float -> Int -> Int
+adjustIndex offsetX clientWidth =
+    if offsetX >= (toFloat clientWidth * 0.5) then
+        1
+
+    else
+        0
+
+
 attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
 attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange styles =
     let
@@ -759,16 +851,9 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
               , style "display" "inline-block"
               , style "position" "relative"
               , id <| charId m (from + i)
-              , custom "mousedown" <|
-                    Json.map2
-                        (\offsetX w ->
-                            { message = lift (MouseDown (from + i) offsetX w)
-                            , preventDefault = True
-                            , stopPropagation = True
-                            }
-                        )
-                        (Json.at [ "offsetX" ] Json.float)
-                        (Json.at [ "target", "clientWidth" ] Json.int)
+              , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
+              , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
+              , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
               ]
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]

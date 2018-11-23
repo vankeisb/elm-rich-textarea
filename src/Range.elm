@@ -15,8 +15,11 @@ type Range
 
 range : Int -> Int -> Range
 range from to =
-    Range from to
+    if from < to then
+        Range from to
 
+    else
+        Range to from
 
 contains : Int -> Range -> Bool
 contains index (Range from to) =
