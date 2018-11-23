@@ -373,13 +373,15 @@ lineSize n text =
         |> Array.get n
 
 
-updateIfSelecting : (Model s -> Model s) -> Model s -> Model s
-updateIfSelecting fun (Model model) =
+updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+updateIfSelecting fun ( Model model, c ) =
     if model.selectingAt /= Nothing then
-        fun <| Model model
+        ( Model model, c )
+            |> Tuple.mapFirst fun
+            |> scrollCaretIntoView model.selection
 
     else
-        Model model
+        ( Model model, c )
 
 
 update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
@@ -407,29 +409,31 @@ update hl msg (Model model) =
 
         MouseUp i ->
             ( Model model
-                |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
             , Cmd.none
             )
+                |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
 
         MouseOver i ->
             ( Model model
-                |> updateIfSelecting (expandSelection i)
             , Cmd.none
             )
+                |> updateIfSelecting (expandSelection i)
 
         MouseOverLine n ->
             ( Model model
+            , Cmd.none
+            )
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
                             |> Maybe.map (\s -> Model m |> expandSelection s)
                             |> Maybe.withDefault (Model m)
                     )
-            , Cmd.none
-            )
 
         MouseUpLine n ->
             ( Model model
+            , Cmd.none
+            )
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
@@ -437,8 +441,6 @@ update hl msg (Model model) =
                             |> Maybe.map (setSelectingAt Nothing)
                             |> Maybe.withDefault (Model m)
                     )
-            , Cmd.none
-            )
 
         BackgroundClicked ->
             -- place caret at the end of the text
@@ -448,15 +450,15 @@ update hl msg (Model model) =
 
         BackgroundMouseOver ->
             ( Model model
-                |> updateIfSelecting (expandSelection <| String.length model.text)
             , Cmd.none
             )
+                |> updateIfSelecting (expandSelection <| String.length model.text)
 
         BackgroundMouseUp ->
             ( Model model
-                |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
             , Cmd.none
             )
+                |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
 
         LineClicked lineIndex ->
             -- place caret at the end of the line
