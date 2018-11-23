@@ -42,29 +42,34 @@ suite =
     describe "UI Tests"
         [ test "single line, no styles" <|
             \_ ->
-                let
-                    (m,c) =
-                        Textarea.init
-                            { idPrefix = "my-ta"
-                            , highlighter =
-                                \text ->
-                                    []
-                            , initialText = "foo bar baz"
-                            }
-
-                in
-                Textarea.view
-                    TextareaMsg
-                    (Textarea.attributedRenderer m TextareaMsg renderer)
-                    m
+                Textarea.init
+                    { idPrefix = "my-ta"
+                    , highlighter =
+                        \text ->
+                            []
+                    , initialText = "foo bar baz"
+                    }
+                    |> Tuple.first
+                    |>
+                        \m ->
+                            Textarea.view
+                                TextareaMsg
+                                (Textarea.attributedRenderer m TextareaMsg renderer)
+                                m
                     |> fromHtml
-                    |> find [ attribute <| A.attribute "data-from" "0" ]
-                    |> children [ text "f" ]
-                    |> count (Expect.equal 1)
+                    |> Expect.all
+                        ( "foo bar baz"
+                            |> String.toList
+                            |> List.indexedMap
+                                (\i c ->
+                                    \html ->
+                                        html
+                                            |> find
+                                                [ attribute
+                                                    <| A.attribute "data-from" (String.fromInt i)
+                                                ]
+                                            |> children [ text (String.fromChar c) ]
+                                            |> count (Expect.equal 1)
+                                )
+                        )
         ]
-
-
---
---makeExpected : String -> List (Range, MyStyle) ->
---makeExpected s =
---    []
