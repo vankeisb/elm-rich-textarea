@@ -1,50 +1,46 @@
 module Textarea exposing
-    ( Model
+    ( InitData
+    , Model
     , Msg
-    , init
-    , view
-    , update
-    , subscriptions
     , attributedRenderer
-    , InitData
+    , init
+    , subscriptions
+    , update
+    , view
     )
 
-
+import Array
+import Browser
+import Browser.Dom as Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Browser
 import Json.Decode as Json
+import Json.Encode as Encode
 import Range exposing (Range)
 import Styles exposing (..)
-import Json.Encode as Encode
-import Browser.Dom as Dom
 import Task
-import Array
-import Time exposing (Posix)
 
 
 type alias Dimensions =
-    { h: Float
-    , w: Float
+    { h : Float
+    , w : Float
     }
 
 
 type alias ModelData s =
-    { idPrefix: String
-    , text: String
-    , selection: Maybe Range
-    , styles: Styles s
-    , styledTexts: List (List (StyledText s))
-    , focused: Bool
-    , time: Posix
-    , blinkStart: Posix
-    , viewportBox: Box
+    { idPrefix : String
+    , text : String
+    , selection : Maybe Range
+    , styles : Styles s
+    , styledTexts : List (List (StyledText s))
+    , focused : Bool
+    , viewportBox : Box
     }
 
 
-type Model s =
-    Model (ModelData s)
+type Model s
+    = Model (ModelData s)
 
 
 type alias Box =
@@ -52,8 +48,8 @@ type alias Box =
     , y : Float
     , h : Float
     , w : Float
-    , scrollTop: Float
-    , scrollLeft: Float
+    , scrollTop : Float
+    , scrollLeft : Float
     }
 
 
@@ -66,8 +62,6 @@ type Msg
     | LineClicked Int
     | Focused (Result Dom.Error ())
     | Blurred
-    | OnTime Posix
-    | TriggerBlink Posix
     | GetViewportPos (Result Dom.Error Dom.Element)
     | GetViewport (Result Dom.Error Dom.Viewport)
     | GetCharViewport (Result Dom.Error Dom.Element)
@@ -75,15 +69,14 @@ type Msg
     | NoOp
 
 
-
 type alias InitData s =
-    { highlighter: Highlighter s
-    , initialText: String
-    , idPrefix: String
+    { highlighter : Highlighter s
+    , initialText : String
+    , idPrefix : String
     }
 
 
-init : InitData s -> (Model s, Cmd Msg)
+init : InitData s -> ( Model s, Cmd Msg )
 init initData =
     let
         initialModelData =
@@ -93,8 +86,6 @@ init initData =
             , styles = Styles.empty
             , styledTexts = []
             , focused = False
-            , time = Time.millisToPosix 0
-            , blinkStart = Time.millisToPosix 0
             , viewportBox =
                 { h = 0
                 , w = 0
@@ -115,13 +106,12 @@ init initData =
 focusTextarea : ModelData s -> Cmd Msg
 focusTextarea d =
     Dom.focus (textareaId d)
-            |> Task.attempt Focused
+        |> Task.attempt Focused
 
 
 textareaId : ModelData s -> String
 textareaId d =
     d.idPrefix ++ "-textarea"
-
 
 
 viewportId : ModelData s -> String
@@ -131,17 +121,24 @@ viewportId d =
 
 charId : ModelData s -> Int -> String
 charId d i =
-    d.idPrefix ++ "-char-" ++ (String.fromInt i)
+    d.idPrefix ++ "-char-" ++ String.fromInt i
+
 
 
 {-
-    Applies styles to a string at a given offset. Selection
-    range is also passed for drawing the selection.
+   Applies styles to a string at a given offset. Selection
+   range is also passed for drawing the selection.
 -}
-type alias  Renderer s m = String -> String -> Int -> Maybe Range -> Bool -> Bool -> List s -> Html m
+
+
+type alias Renderer s m =
+    String -> String -> Int -> Maybe Range -> List s -> Html m
+
 
 
 -- used to display the textarea
+
+
 devMode =
     False
 
@@ -149,21 +146,6 @@ devMode =
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
-        time =
-            Time.posixToMillis d.time
-
-        blinkStart =
-            Time.posixToMillis d.blinkStart
-
-        elapsed =
-            time - blinkStart
-
-        displayCaret =
-            if elapsed < 500 then
-                True
-            else
-                (modBy 2 (elapsed // 700)) == 0
-
         lines =
             d.styledTexts
                 |> List.indexedMap
@@ -177,7 +159,7 @@ view lift renderer (Model d) =
                                     }
                             , style "display" "flex"
                             ]
-                            ( lineElems
+                            (lineElems
                                 |> List.map
                                     (\e ->
                                         renderer
@@ -185,17 +167,15 @@ view lift renderer (Model d) =
                                             e.text
                                             (Range.getFrom e.range)
                                             d.selection
-                                            d.focused
-                                            displayCaret
                                             e.styles
                                     )
                             )
                     )
 
-        (ss, se) =
+        ( ss, se ) =
             d.selection
                 |> Maybe.map Range.getBounds
-                |> Maybe.withDefault (0,0)
+                |> Maybe.withDefault ( 0, 0 )
     in
     div
         [ style "position" "absolute"
@@ -228,6 +208,25 @@ view lift renderer (Model d) =
                     (Json.at [ "target", "scrollTop" ] Json.float)
             ]
             lines
+        , node "style"
+            [ attribute "scoped" ""
+            ]
+            [ text """
+                    .blinking-cursor {
+                        opacity: 1;
+                        animation: 1s blink step-end infinite;
+                    }
+
+                    @keyframes blink {
+                      from, to {
+                        opacity: 1;
+                      }
+                      50% {
+                        opacity: 0;
+                      }
+                    }
+        """
+            ]
         , Html.map lift <|
             textarea
                 [ value d.text
@@ -237,11 +236,13 @@ view lift renderer (Model d) =
                 , style "left" <|
                     if devMode then
                         "350px"
+
                     else
                         "-10000px"
                 , style "top" <|
                     if devMode then
                         "65px"
+
                     else
                         "-10000px"
                 , style "width" "200px"
@@ -259,9 +260,13 @@ view lift renderer (Model d) =
                         (\keyCode start end ->
                             { message = OnKeyDown keyCode start end
                             , preventDefault =
-                                keyCode == 9 -- stop tab
+                                keyCode == 9
+
+                            -- stop tab
                             , stopPropagation =
-                                keyCode == 9 -- stop tab
+                                keyCode == 9
+
+                            -- stop tab
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
@@ -272,9 +277,13 @@ view lift renderer (Model d) =
                         (\keyCode start end ->
                             { message = OnKeyUp keyCode start end
                             , preventDefault =
-                                keyCode == 9 -- stop tab
+                                keyCode == 9
+
+                            -- stop tab
                             , stopPropagation =
-                                keyCode == 9 -- stop tab
+                                keyCode == 9
+
+                            -- stop tab
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
@@ -287,7 +296,8 @@ view lift renderer (Model d) =
         ]
 
 
-type alias Highlighter s = String -> List (Range, s)
+type alias Highlighter s =
+    String -> List ( Range, s )
 
 
 computeStyles : Highlighter s -> Model s -> Model s
@@ -296,10 +306,9 @@ computeStyles highlighter (Model d) =
         { d
             | styles =
                 Styles.empty
-                    |> Styles.addStyles ( highlighter d.text )
+                    |> Styles.addStyles (highlighter d.text)
         }
         |> computeStyledTexts
-
 
 
 computeStyledTexts : Model s -> Model s
@@ -309,33 +318,31 @@ computeStyledTexts (Model d) =
             | styledTexts =
                 String.split "\n" d.text
                     |> List.foldl
-                        (\line (offset, res) ->
+                        (\line ( offset, res ) ->
                             let
                                 lineWithLf =
                                     line ++ "\n"
                             in
-                            ( offset + (String.length lineWithLf)
-                            , res ++
-                                [ Styles.applyToText
-                                    lineWithLf
-                                    offset
-                                    d.styles
-                                ]
+                            ( offset + String.length lineWithLf
+                            , res
+                                ++ [ Styles.applyToText
+                                        lineWithLf
+                                        offset
+                                        d.styles
+                                   ]
                             )
                         )
-                        (0, [])
+                        ( 0, [] )
                     |> Tuple.second
         }
 
 
-
 noCmd m =
-    (m, Cmd.none)
+    ( m, Cmd.none )
 
 
-
-setSelection : Maybe Range -> (Model s, Cmd Msg) -> (Model s, Cmd Msg)
-setSelection r (Model d, c) =
+setSelection : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+setSelection r ( Model d, c ) =
     ( Model
         { d
             | selection =
@@ -346,11 +353,9 @@ setSelection r (Model d, c) =
         |> scrollCaretIntoView d.selection
 
 
-
-update : Highlighter s -> Msg -> Model s -> (Model s, Cmd Msg)
+update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
 update hl msg (Model model) =
     case msg of
-
         OnInput s start end ->
             Model
                 { model
@@ -361,7 +366,6 @@ update hl msg (Model model) =
                 |> noCmd
                 |> setSelection
                     (Just (Range.range start end))
-
 
         OnKeyDown keyCode start end ->
             onKey True hl keyCode start end model
@@ -374,11 +378,11 @@ update hl msg (Model model) =
             -- on the location of the click inside the
             -- char wrapper
             setCaretPos
-                (
-                    if offsetX < ((toFloat clientWidth) / 2) then
-                        i
-                    else
-                        i + 1
+                (if offsetX < (toFloat clientWidth / 2) then
+                    i
+
+                 else
+                    i + 1
                 )
                 (Model model)
 
@@ -395,14 +399,14 @@ update hl msg (Model model) =
                     String.split "\n" model.text
                         |> List.map String.length
                         |> List.foldl
-                            (\len (total, res) ->
+                            (\len ( total, res ) ->
                                 let
-                                    newTotal = len + total + 1
+                                    newTotal =
+                                        len + total + 1
                                 in
-                                ( newTotal, res ++ [ newTotal ])
-
+                                ( newTotal, res ++ [ newTotal ] )
                             )
-                            (0, [])
+                            ( 0, [] )
                         |> Tuple.second
                         |> Array.fromList
                         |> Array.get lineIndex
@@ -413,44 +417,23 @@ update hl msg (Model model) =
                         setCaretPos (s - 1) (Model model)
                     )
                 |> Maybe.withDefault
-                    (Model model, Cmd.none)
+                    ( Model model, Cmd.none )
 
         Focused (Ok ()) ->
-            Model
+            ( Model
                 { model
                     | focused = True
                 }
-                |> triggerBlink
-
+            , Cmd.none
+            )
 
         Focused (Err _) ->
-            (Model model, Cmd.none)
-
+            ( Model model, Cmd.none )
 
         Blurred ->
             ( Model
                 { model
                     | focused = False
-                }
-            , Cmd.none
-            )
-
-        OnTime posix ->
-            ( Model
-                { model
-                    | time =
-                        posix
-                }
-            , Cmd.none
-            )
-
-        TriggerBlink posix ->
-            ( Model
-                { model
-                    | time =
-                        posix
-                    , blinkStart =
-                        posix
                 }
             , Cmd.none
             )
@@ -475,9 +458,7 @@ update hl msg (Model model) =
                         |> getViewportSize
 
                 Err _ ->
-                    (Model model, Cmd.none)
-
-
+                    ( Model model, Cmd.none )
 
         GetViewport vp ->
             ( case vp of
@@ -496,6 +477,7 @@ update hl msg (Model model) =
                                         v.viewport.width
                                 }
                         }
+
                 Err _ ->
                     Model model
             , Cmd.none
@@ -558,24 +540,29 @@ update hl msg (Model model) =
                         newScrollTop =
                             if bottomDelta > 0 then
                                 scrollTop + bottomDelta
+
                             else if topDelta > 0 then
                                 scrollTop - topDelta
+
                             else
                                 scrollTop
 
                         newScrollLeft =
                             if rightDelta > 0 then
                                 scrollLeft + rightDelta
+
                             else if leftDelta > 0 then
                                 scrollLeft - leftDelta
+
                             else
                                 scrollLeft
                     in
                     ( Model model
                     , setScroll newScrollLeft newScrollTop
                     )
+
                 Err _ ->
-                    (Model model, Cmd.none)
+                    ( Model model, Cmd.none )
 
         Scrolled x y ->
             let
@@ -597,23 +584,10 @@ update hl msg (Model model) =
             )
 
         NoOp ->
-            (Model model, Cmd.none)
+            ( Model model, Cmd.none )
 
 
-triggerBlink : Model s -> (Model s, Cmd Msg)
-triggerBlink (Model m) =
-    ( Model
-        { m
-            | time =
-                Time.millisToPosix 0
-            , blinkStart =
-                Time.millisToPosix 0
-        }
-    , Task.perform TriggerBlink Time.now
-    )
-
-
-setCaretPos : Int -> Model s -> (Model s, Cmd Msg)
+setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
     , focusTextarea d
@@ -622,17 +596,17 @@ setCaretPos i (Model d) =
             (Just <| Range.range i i)
 
 
-onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> (Model s, Cmd Msg)
+onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
 onKey isDown hl keyCode start end d =
     let
-        (newText, newSel) =
+        ( newText, newSel ) =
             if keyCode == 9 && not isDown then
                 -- TAB: insert spaces
                 d.selection
                     |> Maybe.map
                         (\r ->
                             let
-                                (from, to) =
+                                ( from, to ) =
                                     Range.getBounds r
 
                                 left =
@@ -641,31 +615,32 @@ onKey isDown hl keyCode start end d =
                                 right =
                                     String.slice to (String.length d.text) d.text
                             in
-                                ( left ++ "  " ++ right
-                                , Just <| Range.move 2 r
-                                )
+                            ( left ++ "  " ++ right
+                            , Just <| Range.move 2 r
+                            )
                         )
                     |> Maybe.withDefault
                         ( d.text, d.selection )
+
             else
                 ( d.text
                 , Just <| Range.range start end
                 )
     in
-    Model
+    ( Model
         { d
             | text =
                 newText
         }
         |> computeStyles hl
-        |> triggerBlink
+    , Cmd.none
+    )
         |> getViewportPos
         |> setSelection newSel
 
 
-
-getViewportPos : (Model s, Cmd Msg) -> (Model s, Cmd Msg)
-getViewportPos (Model d, c) =
+getViewportPos : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
         [ c
@@ -675,9 +650,8 @@ getViewportPos (Model d, c) =
     )
 
 
-
-getViewportSize: (Model s, Cmd Msg) -> (Model s, Cmd Msg)
-getViewportSize (Model d, c) =
+getViewportSize : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportSize ( Model d, c ) =
     ( Model d
     , Cmd.batch
         [ c
@@ -687,9 +661,8 @@ getViewportSize (Model d, c) =
     )
 
 
-
-scrollCaretIntoView: Maybe Range -> (Model s, Cmd Msg) -> (Model s, Cmd Msg)
-scrollCaretIntoView prevRange (Model d, c) =
+scrollCaretIntoView : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+scrollCaretIntoView prevRange ( Model d, c ) =
     let
         scrollCmd charIndex =
             Dom.getElement
@@ -701,7 +674,7 @@ scrollCaretIntoView prevRange (Model d, c) =
                 |> Maybe.map
                     (\r ->
                         let
-                            (newFrom, newTo) =
+                            ( newFrom, newTo ) =
                                 Range.getBounds r
                         in
                         -- compare new selection with previous one
@@ -709,21 +682,24 @@ scrollCaretIntoView prevRange (Model d, c) =
                         if newFrom == newTo then
                             -- new range is a caret : we can get the charId
                             scrollCmd (Range.getFrom r)
+
                         else
                             -- we need to compare with the previous range and
                             -- see how it "expanded"
                             case prevRange of
                                 Just pr ->
                                     let
-                                        (oldFrom, oldTo) =
+                                        ( oldFrom, oldTo ) =
                                             Range.getBounds pr
                                     in
                                     if oldFrom == newFrom && oldTo /= newTo then
                                         -- "right" expansion : use the right offset
                                         scrollCmd newTo
+
                                     else if oldFrom /= newFrom && oldTo == newTo then
                                         -- "left" expansion : use the left offset
                                         scrollCmd newFrom
+
                                     else
                                         Cmd.none
 
@@ -731,9 +707,8 @@ scrollCaretIntoView prevRange (Model d, c) =
                                     Cmd.none
                     )
                 |> Maybe.withDefault Cmd.none
-
     in
-    (Model d
+    ( Model d
     , Cmd.batch
         [ c
         , cmd
@@ -741,27 +716,12 @@ scrollCaretIntoView prevRange (Model d, c) =
     )
 
 
-
 subscriptions : Model s -> Sub Msg
 subscriptions (Model model) =
-    let
-        isCaretSelection =
-            model.selection
-                |> Maybe.map Range.getBounds
-                |> Maybe.map
-                    (\(from,to) ->
-                        from == to
-                    )
-                |> Maybe.withDefault False
-    in
-    if model.focused  && isCaretSelection then
-        Time.every 100 OnTime
-    else
-        Sub.none
+    Sub.none
 
 
-
-addStyles : List (Range, s) -> Model s -> Model s
+addStyles : List ( Range, s ) -> Model s -> Model s
 addStyles styles (Model d) =
     Model
         { d
@@ -770,41 +730,35 @@ addStyles styles (Model d) =
         }
 
 
-
 attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange focused blinkDisplayCaret styles =
+attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange styles =
     let
         dataFrom f =
-            attribute "data-from" <| (String.fromInt f)
+            attribute "data-from" <| String.fromInt f
 
         attrs =
             attrsSupplier styles
 
         charAttrs i =
             let
-                (isSelected, isCaretLeft) =
-                    if focused then
-                        selRange
-                            |> Maybe.map
-                                (\r ->
-                                    ( Range.contains (from + i) r
-                                    , blinkDisplayCaret && Range.isCaret (from + i) r
-                                    )
+                ( isSelected, isCaretLeft ) =
+                    selRange
+                        |> Maybe.map
+                            (\r ->
+                                ( Range.contains (from + i) r
+                                , Range.isCaret (from + i) r
                                 )
-                            |> Maybe.withDefault
-                                ( False
-                                , False
-                                )
-                    else
-                        ( False, False )
-
+                            )
+                        |> Maybe.withDefault
+                            ( False
+                            , False
+                            )
             in
-            (
-                [ dataFrom <| from + i
-                , style "display" "inline-block"
-                , style "position" "relative"
-                , id <| charId m (from + i)
-                , custom "mousedown" <|
+            ( [ dataFrom <| from + i
+              , style "display" "inline-block"
+              , style "position" "relative"
+              , id <| charId m (from + i)
+              , custom "mousedown" <|
                     Json.map2
                         (\offsetX w ->
                             { message = lift (MouseDown (from + i) offsetX w)
@@ -814,44 +768,43 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange focus
                         )
                         (Json.at [ "offsetX" ] Json.float)
                         (Json.at [ "target", "clientWidth" ] Json.int)
+              ]
+                ++ (if isSelected then
+                        [ style "background-color" "lightblue" ]
 
-                ] ++
-                    (
-                        if isSelected then
-                            [ style "background-color" "lightblue" ]
-                        else
-                            []
-                    )
+                    else
+                        []
+                   )
             , isCaretLeft
             )
-
     in
     span
         attrs
-        ( str
+        (str
             |> String.toList
             |> List.indexedMap
                 (\i c ->
                     let
-                        (ca, isCaretLeft) =
+                        ( ca, isCaretLeft ) =
                             charAttrs i
                     in
                     div
                         ca
-                        [
-                            if isCaretLeft then
-                                div
-                                    [ style "border-left" "1px solid black"
-                                    , style "position" "absolute"
-                                    , style "top" "0"
-                                    , style "left" "0"
-                                    , style "bottom" "0"
-                                    , style "width" "0px"
-                                    , style "box-sizing" "border-box"
-                                    ]
-                                    []
-                            else
-                                text ""
+                        [ if isCaretLeft then
+                            div
+                                [ style "border-left" "1px solid black"
+                                , style "position" "absolute"
+                                , style "top" "0"
+                                , style "left" "0"
+                                , style "bottom" "0"
+                                , style "width" "0px"
+                                , style "box-sizing" "border-box"
+                                , class "blinking-cursor"
+                                ]
+                                []
+
+                          else
+                            text ""
                         , text (String.fromChar c)
                         ]
                 )
