@@ -7,6 +7,7 @@ module Textarea exposing
     , subscriptions
     , update
     , view
+    , Highlighter
     )
 
 import Internal.Textarea exposing (..)
