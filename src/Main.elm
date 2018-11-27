@@ -31,7 +31,8 @@ init idPrefix =
             Textarea.init
                 { idPrefix = "my-ta"
                 , highlighter = highlighter
-                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                , initialText = "foo\nbar"
+--                , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 }
     in
     ( { textareaModel = m
@@ -114,7 +115,8 @@ highlighter text =
                 , "bar"
                 ]
     in
-    keywords ++ identifiers
+    []
+--    keywords ++ identifiers
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

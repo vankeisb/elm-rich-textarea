@@ -9,6 +9,7 @@ module Textarea exposing
     , view
     )
 
+import Internal.Textarea exposing (..)
 import Array
 import Browser
 import Browser.Dom as Dom
@@ -24,58 +25,9 @@ import Array
 import Time exposing (Posix)
 
 
-type alias Dimensions =
-    { h : Float
-    , w : Float
-    }
+type alias Model s = Internal.Textarea.Model s
 
-
-type alias ModelData s =
-    { idPrefix : String
-    , text : String
-    , selection : Maybe Range
-    , styles : Styles s
-    , styledTexts : List (List (StyledText s))
-    , focused : Bool
-    , viewportBox : Box
-    , selectingAt : Maybe Int
-    }
-
-
-type Model s
-    = Model (ModelData s)
-
-
-type alias Box =
-    { x : Float
-    , y : Float
-    , h : Float
-    , w : Float
-    , scrollTop : Float
-    , scrollLeft : Float
-    }
-
-
-type Msg
-    = OnInput String Int Int
-    | OnKeyDown Int Int Int
-    | OnKeyUp Int Int Int
-    | MouseDown Int
-    | MouseUp Int
-    | MouseOver Int
-    | MouseOverLine Int
-    | MouseUpLine Int
-    | BackgroundClicked
-    | BackgroundMouseOver
-    | BackgroundMouseUp
-    | LineClicked Int
-    | Focused (Result Dom.Error ())
-    | Blurred
-    | GetViewportPos (Result Dom.Error Dom.Element)
-    | GetViewport (Result Dom.Error Dom.Viewport)
-    | GetCharViewport (Result Dom.Error Dom.Element)
-    | Scrolled Float Float
-    | NoOp
+type alias Msg = Internal.Textarea.Msg
 
 
 type alias InitData s =
