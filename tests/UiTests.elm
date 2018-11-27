@@ -73,10 +73,7 @@ suite =
         , test "click eol should place caret at the end of the line and nowhere else" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> Textarea.update
-                        emptyHighlighter
-                        (IT.LineClicked 1)
-                    |> Tuple.first
+                    |> updateNoHl (IT.LineClicked 1)
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
@@ -85,34 +82,45 @@ suite =
                                 )
                                 m.selection
                         ]
-        , test "when selection is at eol then the caret should blink" <|
+        , test "when clicking the bg then the caret should be at the end of text" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> Textarea.update
-                        emptyHighlighter
-                        (IT.BackgroundClicked)
-                    |> Tuple.first
-                    |>
-                        \m ->
-                            Textarea.view
-                                TextareaMsg
-                                (Textarea.attributedRenderer m TextareaMsg renderer)
-                                m
-                    |> fromHtml
+                    |> updateNoHl IT.BackgroundClicked
+                    |> renderHtml
                     |> has
-                        [ attribute <| A.attribute "data-from" "11"
-                        , containing
-                            [ class "blinking-cursor"
---                            , containing
---                                [ text "\n"
---                                ]
+                        [ all
+                            [ attribute <| A.attribute "data-from" "11"
+                            , containing
+                                [ class "blinking-cursor" ]
+                            , containing
+                                [ text "\n" ]
                             ]
---                            , all
---                                [ class "blinking-cursor"
---                                , text ""
---                                ]
+                        ]
+        , test "when clicking on the line then the caret should be at the end of this line" <|
+            \_ ->
+                createModelNoHl "foo\nbar\nbaz"
+                    |> updateNoHl (IT.LineClicked 0)
+                    |> renderHtml
+                    |> has
+                        [ all
+                            [ attribute <| A.attribute "data-from" "3"
+                            , containing
+                                [ class "blinking-cursor" ]
+                            , containing
+                                [ text "\n" ]
+                            ]
                         ]
         ]
+
+
+update : Highlighter MyStyle -> IT.Msg -> Model MyStyle -> Model MyStyle
+update hl msg model =
+    Textarea.update hl msg model
+        |> Tuple.first
+
+
+updateNoHl =
+    update emptyHighlighter
 
 
 emptyHighlighter =
