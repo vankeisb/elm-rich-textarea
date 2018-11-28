@@ -365,7 +365,7 @@ update hl msg (Model model) =
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
-                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.map (\s -> Model m |> expandSelection (s - 1))
                             |> Maybe.withDefault (Model m)
                     )
 

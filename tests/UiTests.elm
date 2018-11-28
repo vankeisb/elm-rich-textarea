@@ -1,14 +1,6 @@
 module UiTests exposing
-    ( Msg(..)
-    , MyStyle(..)
-    , createModel
-    , createModelNoHl
-    , emptyHighlighter
-    , renderHtml
-    , renderer
-    , suite
-    , update
-    , updateNoHl
+    ( suite
+    , updateSuite
     )
 
 import Expect exposing (Expectation)
@@ -227,3 +219,38 @@ expectSelectedText expected single =
 selectedDiv : Selector
 selectedDiv =
     style "background-color" "lightblue"
+
+
+
+-- TODO move to separate module
+-- The problem is sharing utility functions, like createModel, etc.
+-- Apparently test modules cannot consume other modules under the tests/ folder.
+
+
+updateSuite : Test
+updateSuite =
+    describe "Update tests"
+        [ describe "mouse selection"
+            [ test "expand to end of line" <|
+                \_ ->
+                    createModelNoHl "foo\nbar\nbaz"
+                        |> withSelection (range 3 3)
+                        |> whileSelectingAt 3
+                        |> updateNoHl (IT.MouseUpLine 0)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 3 3)
+            , test "expand at end of line" <|
+                \_ ->
+                    createModelNoHl "foo\nbar\nbaz"
+                        |> withSelection (range 3 3)
+                        |> whileSelectingAt 3
+                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 3 3)
+            ]
+        ]
+
+
+getSelection : Model s -> Maybe Range
+getSelection (IT.Model d) =
+    .selection d
