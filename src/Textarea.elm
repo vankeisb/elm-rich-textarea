@@ -595,7 +595,7 @@ setSelectingAt at (Model d) =
 
 expandSelection : Int -> Model s -> Model s
 expandSelection to (Model d) =
-    Model { d | selection = Maybe.map (Range.range to) d.selectingAt }
+    Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
 onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )

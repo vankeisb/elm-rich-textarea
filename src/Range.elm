@@ -1,6 +1,7 @@
 module Range exposing
     ( Range
     , contains
+    , expand
     , getBounds
     , getFrom
     , isCaret
@@ -20,6 +21,16 @@ range from to =
 
     else
         Range to from
+
+
+expand : Int -> Int -> Range
+expand to at =
+    if to <= at then
+        Range to at
+
+    else
+        Range at to
+
 
 contains : Int -> Range -> Bool
 contains index (Range from to) =
