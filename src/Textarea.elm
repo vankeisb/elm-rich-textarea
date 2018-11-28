@@ -117,7 +117,7 @@ view lift renderer (Model d) =
                     (\lineNumber lineElems ->
                         div
                             [ style "display" "flex"
-                            , mouseEvent "mousedown" (\_ -> lift <| LineClicked lineNumber)
+                            , mouseEvent "mousedown" (\_ -> lift <| MouseDownLine lineNumber)
                             , mouseEvent "mouseover" (\_ -> lift <| MouseOverLine lineNumber)
                             , mouseEvent "mouseup" (\_ -> lift <| MouseUpLine lineNumber)
                             ]
@@ -399,7 +399,7 @@ update hl msg (Model model) =
             )
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
 
-        LineClicked lineIndex ->
+        MouseDownLine lineIndex ->
             -- place caret at the end of the line
             lineSize lineIndex model.text
                 |> Maybe.map

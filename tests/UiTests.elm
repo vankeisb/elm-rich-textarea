@@ -80,11 +80,11 @@ suite =
                         ]
                     |> E.simulate
                         (E.custom "mousedown" simulatedEvent)
-                    |> E.expect (TextareaMsg <| IT.LineClicked 1)
+                    |> E.expect (TextareaMsg <| IT.MouseDownLine 1)
         , test "click eol should place caret at the end of the line and nowhere else" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl (IT.LineClicked 1)
+                    |> updateNoHl (IT.MouseDownLine 1)
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
@@ -102,7 +102,7 @@ suite =
         , test "when mouse down on the line then the caret should be at the end of this line" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl (IT.LineClicked 0)
+                    |> updateNoHl (IT.MouseDownLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , test "when clicking (mouse up and down) on the line then the caret should be at the end of this line" <|
