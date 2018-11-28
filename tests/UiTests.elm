@@ -110,9 +110,7 @@ suite =
                 createModelNoHl "foo\nbar\nbaz"
                     |> withSelection (range 3 3)
                     |> whileSelectingAt 3
-                    |> Debug.log "FW1"
                     |> updateNoHl (IT.MouseUpLine 0)
-                    |> Debug.log "FW2"
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         ]
