@@ -1,14 +1,16 @@
 module Internal.Textarea exposing
-    ( Msg(..)
-    , ModelData
-    , Box
+    ( Box
     , Model(..)
+    , ModelData
+    , Msg(..)
+    , lineSize
     )
 
-
+import Array
 import Browser.Dom as Dom
-import Styles exposing (Styles, StyledText)
 import Range exposing (Range)
+import Styles exposing (StyledText, Styles)
+
 
 type Msg
     = OnInput String Int Int
@@ -54,6 +56,23 @@ type alias Box =
     }
 
 
-
 type Model s
     = Model (ModelData s)
+
+
+lineSize : Int -> String -> Maybe Int
+lineSize n text =
+    String.split "\n" text
+        |> List.map String.length
+        |> List.foldl
+            (\len ( total, res ) ->
+                let
+                    newTotal =
+                        len + total + 1
+                in
+                ( newTotal, res ++ [ newTotal ] )
+            )
+            ( 0, [] )
+        |> Tuple.second
+        |> Array.fromList
+        |> Array.get n

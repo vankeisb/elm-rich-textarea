@@ -1,5 +1,6 @@
 module Textarea exposing
-    ( InitData
+    ( Highlighter
+    , InitData
     , Model
     , Msg
     , attributedRenderer
@@ -7,28 +8,29 @@ module Textarea exposing
     , subscriptions
     , update
     , view
-    , Highlighter
     )
 
-import Internal.Textarea exposing (..)
 import Array
 import Browser
 import Browser.Dom as Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Internal.Textarea exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Range exposing (Range)
 import Styles exposing (..)
 import Task
-import Array
 import Time exposing (Posix)
 
 
-type alias Model s = Internal.Textarea.Model s
+type alias Model s =
+    Internal.Textarea.Model s
 
-type alias Msg = Internal.Textarea.Msg
+
+type alias Msg =
+    Internal.Textarea.Msg
 
 
 type alias InitData s =
@@ -96,6 +98,7 @@ charId d i =
 
 type alias Renderer s m =
     String -> String -> Int -> Maybe Range -> List s -> Html m
+
 
 
 -- used to display the textarea
@@ -309,24 +312,6 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-lineSize : Int -> String -> Maybe Int
-lineSize n text =
-    String.split "\n" text
-        |> List.map String.length
-        |> List.foldl
-            (\len ( total, res ) ->
-                let
-                    newTotal =
-                        len + total + 1
-                in
-                ( newTotal, res ++ [ newTotal ] )
-            )
-            ( 0, [] )
-        |> Tuple.second
-        |> Array.fromList
-        |> Array.get n
-
-
 updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 updateIfSelecting fun ( Model model, c ) =
     if model.selectingAt /= Nothing then
@@ -391,7 +376,7 @@ update hl msg (Model model) =
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
-                            |> Maybe.map (\s -> Model m |> expandSelection s)
+                            |> Maybe.map (\s -> Model m |> expandSelection (s - 1))
                             |> Maybe.map (setSelectingAt Nothing)
                             |> Maybe.withDefault (Model m)
                     )

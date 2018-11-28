@@ -1,16 +1,28 @@
-module UiTests exposing (..)
+module UiTests exposing
+    ( Msg(..)
+    , MyStyle(..)
+    , createModel
+    , createModelNoHl
+    , emptyHighlighter
+    , renderHtml
+    , renderer
+    , suite
+    , update
+    , updateNoHl
+    )
 
 import Expect exposing (Expectation)
-import Test exposing (..)
-import Textarea exposing (..)
-import Internal.Textarea as IT
 import Html
 import Html.Attributes as A
+import Internal.Textarea as IT
+import Json.Encode as Encode
+import Range exposing (Range, range)
+import String exposing (fromInt)
+import Test exposing (..)
+import Test.Html.Event as E
 import Test.Html.Query exposing (..)
 import Test.Html.Selector exposing (..)
-import Range exposing (Range)
-import Test.Html.Event as E
-import Json.Encode as Encode
+import Textarea exposing (..)
 
 
 type Msg
@@ -22,7 +34,7 @@ type MyStyle
     | Style2
 
 
-suite: Test
+suite : Test
 suite =
     describe "UI Tests"
         [ test "single line, no styles" <|
@@ -30,31 +42,30 @@ suite =
                 createModelNoHl "foo bar baz"
                     |> renderHtml
                     |> Expect.all
-                        ( "foo bar baz"
+                        ("foo bar baz"
                             |> String.toList
                             |> List.indexedMap
                                 (\i c ->
                                     \html ->
                                         html
                                             |> find
-                                                [ attribute
-                                                    <| A.attribute "data-from" (String.fromInt i)
+                                                [ attribute <|
+                                                    A.attribute "data-from" (String.fromInt i)
                                                 ]
                                             |> children [ text (String.fromChar c) ]
                                             |> count (Expect.equal 1)
                                 )
                         )
         , test "click line should trigger LineClicked" <|
-             \_ ->
+            \_ ->
                 let
                     simulatedEvent =
-                          Encode.object
-                            [ ("offsetX", Encode.float 0)
-                            ,
-                                ( "target"
-                                , Encode.object
-                                    [ ("clientWidth", Encode.int 0) ]
-                                )
+                        Encode.object
+                            [ ( "offsetX", Encode.float 0 )
+                            , ( "target"
+                              , Encode.object
+                                    [ ( "clientWidth", Encode.int 0 ) ]
+                              )
                             ]
                 in
                 createModelNoHl "foo\nbar\nbaz"
@@ -62,8 +73,8 @@ suite =
                     |> find
                         [ style "display" "flex"
                         , containing
-                            [ attribute
-                                <| A.attribute "data-from" "6"
+                            [ attribute <|
+                                A.attribute "data-from" "6"
                             , text "r"
                             ]
                         ]
@@ -77,7 +88,7 @@ suite =
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
-                                ( Just <|
+                                (Just <|
                                     Range.range 7 7
                                 )
                                 m.selection
@@ -87,29 +98,23 @@ suite =
                 createModelNoHl "foo\nbar\nbaz"
                     |> updateNoHl IT.BackgroundClicked
                     |> renderHtml
-                    |> has
-                        [ all
-                            [ attribute <| A.attribute "data-from" "11"
-                            , containing
-                                [ class "blinking-cursor" ]
-                            , containing
-                                [ text "\n" ]
-                            ]
-                        ]
-        , test "when clicking on the line then the caret should be at the end of this line" <|
+                    |> has [ hasCaretAt 11 ]
+        , test "when mouse down on the line then the caret should be at the end of this line" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
                     |> updateNoHl (IT.LineClicked 0)
                     |> renderHtml
-                    |> has
-                        [ all
-                            [ attribute <| A.attribute "data-from" "3"
-                            , containing
-                                [ class "blinking-cursor" ]
-                            , containing
-                                [ text "\n" ]
-                            ]
-                        ]
+                    |> has [ hasCaretAt 3 ]
+        , test "when clicking (mouse up and down) on the line then the caret should be at the end of this line" <|
+            \_ ->
+                createModelNoHl "foo\nbar\nbaz"
+                    |> withSelection (range 3 3)
+                    |> whileSelectingAt 3
+                    |> Debug.log "FW1"
+                    |> updateNoHl (IT.MouseUpLine 0)
+                    |> Debug.log "FW2"
+                    |> renderHtml
+                    |> has [ hasCaretAt 3 ]
         ]
 
 
@@ -147,7 +152,6 @@ renderer myStyles =
             []
 
 
-
 createModel : Highlighter MyStyle -> String -> Model MyStyle
 createModel hl str =
     Textarea.init
@@ -162,6 +166,22 @@ createModelNoHl =
     createModel emptyHighlighter
 
 
+withSelection : Range -> Model s -> Model s
+withSelection range (IT.Model d) =
+    IT.Model
+        { d
+            | selection = Just range
+        }
+
+
+whileSelectingAt : Int -> Model s -> Model s
+whileSelectingAt at (IT.Model d) =
+    IT.Model
+        { d
+            | selectingAt = Just at
+        }
+
+
 renderHtml : Model MyStyle -> Single Msg
 renderHtml m =
     Textarea.view
@@ -169,3 +189,14 @@ renderHtml m =
         (Textarea.attributedRenderer m TextareaMsg renderer)
         m
         |> fromHtml
+
+
+hasCaretAt : Int -> Selector
+hasCaretAt pos =
+    all
+        [ attribute <| A.attribute "data-from" (fromInt pos)
+        , containing
+            [ class "blinking-cursor" ]
+        , containing
+            [ text "\n" ]
+        ]
