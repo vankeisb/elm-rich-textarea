@@ -16,8 +16,9 @@ import Html
 import Html.Attributes as A
 import Internal.Textarea as IT
 import Json.Encode as Encode
+import List exposing (indexedMap)
 import Range exposing (Range, range)
-import String exposing (fromInt)
+import String exposing (fromChar, fromInt, toList)
 import Test exposing (..)
 import Test.Html.Event as E
 import Test.Html.Query exposing (..)
@@ -113,6 +114,16 @@ suite =
                     |> updateNoHl (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
+        , describe "mouse selection"
+            [ test "expand to end of line" <|
+                \_ ->
+                    createModelNoHl "gnu\nbar\nbaz"
+                        |> withSelection (range 1 2)
+                        |> whileSelectingAt 1
+                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> renderHtml
+                        |> expectSelectedText "nu"
+            ]
         ]
 
 
@@ -198,3 +209,21 @@ hasCaretAt pos =
         , containing
             [ text "\n" ]
         ]
+
+
+expectSelectedText : String -> Single Msg -> Expectation
+expectSelectedText expected single =
+    single
+        |> findAll [ selectedDiv ]
+        |> Expect.all
+            (toList expected
+                |> indexedMap
+                    (\i c ->
+                        index i >> has [ text <| fromChar c ]
+                    )
+            )
+
+
+selectedDiv : Selector
+selectedDiv =
+    style "background-color" "lightblue"
