@@ -478,6 +478,9 @@ update hl msg (Model model) =
             case element of
                 Ok e ->
                     let
+                        lead =
+                            50
+
                         scrollTop =
                             model.viewportBox.scrollTop
 
@@ -488,13 +491,13 @@ update hl msg (Model model) =
                             charTop + e.element.height
 
                         viewportTop =
-                            model.viewportBox.y
+                            model.viewportBox.y + lead
 
                         topDelta =
                             viewportTop - charTop
 
                         viewportBottom =
-                            viewportTop + model.viewportBox.h
+                            viewportTop + model.viewportBox.h - 2 * lead
 
                         bottomDelta =
                             charBottom - viewportBottom
@@ -509,13 +512,13 @@ update hl msg (Model model) =
                             charLeft + e.element.width
 
                         viewportLeft =
-                            model.viewportBox.x
+                            model.viewportBox.x + lead
 
                         leftDelta =
                             viewportLeft - charLeft
 
                         viewportRight =
-                            viewportLeft + model.viewportBox.w
+                            viewportLeft + model.viewportBox.w - 2 * lead
 
                         rightDelta =
                             charRight - viewportRight
