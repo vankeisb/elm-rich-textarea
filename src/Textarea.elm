@@ -587,8 +587,6 @@ setCaretPos i (Model d) =
         |> setSelectingAt (Just i)
     , focusTextarea d
     )
-        |> setSelection
-            (Just <| Range.range i i)
 
 
 setSelectingAt : Maybe Int -> Model s -> Model s
