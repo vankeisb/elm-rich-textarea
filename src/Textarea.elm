@@ -479,7 +479,7 @@ update hl msg (Model model) =
                 Ok e ->
                     let
                         lead =
-                            50
+                            e.element.height
 
                         scrollTop =
                             model.viewportBox.scrollTop
