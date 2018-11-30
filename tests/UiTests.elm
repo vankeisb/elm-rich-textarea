@@ -74,28 +74,37 @@ suite =
                     |> E.simulate
                         (E.custom "mousedown" simulatedEvent)
                     |> E.expect (TextareaMsg <| IT.MouseDownLine 1)
-        , test "click eol should place caret at the end of the line and nowhere else" <|
+        , test "do not place caret on mouse down (line)" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
                     |> updateNoHl (IT.MouseDownLine 1)
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
-                                (Just <|
-                                    Range.range 7 7
-                                )
+                                Nothing
                                 m.selection
+                        ]
+        , test "when clicking the bg then the caret should not be set" <|
+            \_ ->
+                createModelNoHl "foo\nbar\nbaz"
+                    |> updateNoHl IT.BackgroundClicked
+                    |> Expect.all
+                        [ getSelection >> Expect.equal Nothing
+                        , getSelectingAt >> Expect.equal (Just 11)
+                        , renderHtml >> hasNot [ hasCaretAt 11 ]
                         ]
         , test "when clicking the bg then the caret should be at the end of text" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl IT.BackgroundClicked
+                    |> whileSelectingAt 11
+                    |> updateNoHl IT.BackgroundMouseUp
                     |> renderHtml
                     |> has [ hasCaretAt 11 ]
         , test "when mouse down on the line then the caret should be at the end of this line" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl (IT.MouseDownLine 0)
+                    |> whileSelectingAt 3
+                    |> updateNoHl (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , test "when clicking (mouse up and down) on the line then the caret should be at the end of this line" <|
@@ -254,3 +263,8 @@ updateSuite =
 getSelection : Model s -> Maybe Range
 getSelection (IT.Model d) =
     .selection d
+
+
+getSelectingAt : Model s -> Maybe Int
+getSelectingAt (IT.Model d) =
+    .selectingAt d
