@@ -19,7 +19,7 @@ import Textarea exposing (..)
 
 
 type Msg
-    = TextareaMsg Textarea.Msg
+    = TextareaMsg (Textarea.Msg MyStyle)
 
 
 type MyStyle
@@ -128,7 +128,7 @@ suite =
         ]
 
 
-update : Highlighter MyStyle -> IT.Msg -> Model MyStyle -> Model MyStyle
+update : Highlighter MyStyle -> IT.Msg MyStyle -> Model MyStyle -> Model MyStyle
 update hl msg model =
     Textarea.update hl msg model
         |> Tuple.first

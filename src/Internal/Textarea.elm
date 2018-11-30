@@ -12,7 +12,7 @@ import Range exposing (Range)
 import Styles exposing (StyledText, Styles)
 
 
-type Msg
+type Msg s
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
@@ -32,6 +32,7 @@ type Msg
     | GetCharViewport (Result Dom.Error Dom.Element)
     | Scrolled Float Float
     | NoOp
+    | NewStyles (List ( Range, s ))
 
 
 type alias ModelData s =

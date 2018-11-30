@@ -19,8 +19,9 @@ import Html.Events exposing (..)
 import Internal.Textarea exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
+import Process
 import Range exposing (Range)
-import Styles exposing (..)
+import Styles exposing (Styles)
 import Task
 import Time exposing (Posix)
 
@@ -29,8 +30,8 @@ type alias Model s =
     Internal.Textarea.Model s
 
 
-type alias Msg =
-    Internal.Textarea.Msg
+type alias Msg s =
+    Internal.Textarea.Msg s
 
 
 type alias InitData s =
@@ -40,7 +41,7 @@ type alias InitData s =
     }
 
 
-init : InitData s -> ( Model s, Cmd Msg )
+init : InitData s -> ( Model s, Cmd (Msg s) )
 init initData =
     let
         initialModelData =
@@ -68,7 +69,7 @@ init initData =
         |> getViewportPos
 
 
-focusTextarea : ModelData s -> Cmd Msg
+focusTextarea : ModelData s -> Cmd (Msg s)
 focusTextarea d =
     Dom.focus (textareaId d)
         |> Task.attempt Focused
@@ -108,7 +109,7 @@ devMode =
     False
 
 
-view : (Msg -> m) -> Renderer s m -> Model s -> Html m
+view : (Msg s -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
         lines =
@@ -259,13 +260,40 @@ type alias Highlighter s =
     String -> List ( Range, s )
 
 
+computeStylesSync : Highlighter s -> Model s -> ( Model s, Cmd (Msg s) )
+computeStylesSync highlighter model =
+    ( computeStyles highlighter model, Cmd.none )
+
+
+computeStylesAsync : Highlighter s -> Model s -> ( Model s, Cmd (Msg s) )
+computeStylesAsync highlighter (Model d) =
+    let
+        task0 =
+            Task.succeed (highlighter d.text)
+
+        task1 =
+            Process.sleep 2013
+                |> Task.andThen (\_ -> task0)
+
+        cmd =
+            Task.perform NewStyles task0
+    in
+    ( Model d, cmd )
+
+
 computeStyles : Highlighter s -> Model s -> Model s
 computeStyles highlighter (Model d) =
+    Model d
+        |> updateStyles (highlighter d.text)
+
+
+updateStyles : List ( Range, s ) -> Model s -> Model s
+updateStyles styles (Model d) =
     Model
         { d
             | styles =
                 Styles.empty
-                    |> Styles.addStyles (highlighter d.text)
+                    |> Styles.addStyles styles
         }
         |> computeStyledTexts
 
@@ -300,7 +328,7 @@ noCmd m =
     ( m, Cmd.none )
 
 
-setSelection : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+setSelection : Maybe Range -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
 setSelection r ( Model d, c ) =
     ( Model
         { d
@@ -312,7 +340,7 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
 updateIfSelecting fun ( Model model, c ) =
     if model.selectingAt /= Nothing then
         ( Model model, c )
@@ -323,7 +351,7 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Highlighter s -> Msg -> Model s -> ( Model s, Cmd Msg )
+update : Highlighter s -> Msg s -> Model s -> ( Model s, Cmd (Msg s) )
 update hl msg (Model model) =
     case msg of
         OnInput s start end ->
@@ -332,8 +360,7 @@ update hl msg (Model model) =
                     | text =
                         s
                 }
-                |> computeStyles hl
-                |> noCmd
+                |> computeStylesAsync hl
                 |> setSelection
                     (Just (Range.range start end))
 
@@ -580,8 +607,11 @@ update hl msg (Model model) =
         NoOp ->
             ( Model model, Cmd.none )
 
+        NewStyles styles ->
+            ( updateStyles styles <| Model model, Cmd.none )
 
-setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
+
+setCaretPos : Int -> Model s -> ( Model s, Cmd (Msg s) )
 setCaretPos i (Model d) =
     ( Model d
         |> setSelectingAt (Just i)
@@ -599,7 +629,7 @@ expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
-onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg )
+onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
 onKey isDown hl keyCode start end d =
     let
         ( newText, newSel ) =
@@ -630,19 +660,17 @@ onKey isDown hl keyCode start end d =
                 , Just <| Range.range start end
                 )
     in
-    ( Model
+    Model
         { d
             | text =
                 newText
         }
-        |> computeStyles hl
-    , Cmd.none
-    )
+        |> computeStylesAsync hl
         |> getViewportPos
         |> setSelection newSel
 
 
-getViewportPos : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportPos : ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
 getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -653,7 +681,7 @@ getViewportPos ( Model d, c ) =
     )
 
 
-getViewportSize : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportSize : ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
 getViewportSize ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -664,7 +692,7 @@ getViewportSize ( Model d, c ) =
     )
 
 
-scrollCaretIntoView : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+scrollCaretIntoView : Maybe Range -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
 scrollCaretIntoView prevRange ( Model d, c ) =
     let
         scrollCmd charIndex =
@@ -719,7 +747,7 @@ scrollCaretIntoView prevRange ( Model d, c ) =
     )
 
 
-subscriptions : Model s -> Sub Msg
+subscriptions : Model s -> Sub (Msg s)
 subscriptions (Model model) =
     Sub.none
 
@@ -762,7 +790,7 @@ adjustIndex offsetX clientWidth =
         0
 
 
-attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
+attributedRenderer : Model s -> (Msg s -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
 attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange styles =
     let
         dataFrom f =
