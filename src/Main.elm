@@ -6,12 +6,14 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Range exposing (Range)
 import Styles
+import Task
 import Textarea
 
 
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
     | TextClicked
+    | AsyncHighlight ( String, Int )
 
 
 type MyStyle
@@ -125,18 +127,54 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                ( tm, tc ) =
-                    Textarea.update highlighter sub model.textareaModel
+                updateData =
+                    { lift = TextareaMsg
+                    , onHighlight = asyncHighlight
+                    }
+
+                ( tm, c ) =
+                    Textarea.update updateData sub model.textareaModel
             in
             ( { model
                 | textareaModel =
                     tm
               }
-            , Cmd.map TextareaMsg tc
+            , c
             )
 
         TextClicked ->
             ( model, Cmd.none )
+
+        AsyncHighlight ( text, id ) ->
+            if modBy 10 id > 5 then
+                -- skip highlighting
+                ( model, Cmd.none )
+
+            else if modBy 10 id > 0 then
+                -- mismatch highlight id
+                let
+                    ( tm, tc ) =
+                        Textarea.highlight (highlighter text) (id - 1) model.textareaModel
+                in
+                ( { model
+                    | textareaModel =
+                        tm
+                  }
+                , Cmd.map TextareaMsg tc
+                )
+
+            else
+                -- new highlight
+                let
+                    ( tm, tc ) =
+                        Textarea.highlight (highlighter text) id model.textareaModel
+                in
+                ( { model
+                    | textareaModel =
+                        tm
+                  }
+                , Cmd.map TextareaMsg tc
+                )
 
 
 subscriptions : Model -> Sub Msg
@@ -154,3 +192,8 @@ main =
         , subscriptions = subscriptions
         , view = view
         }
+
+
+asyncHighlight : ( String, Int ) -> Cmd Msg
+asyncHighlight arg =
+    Task.perform AsyncHighlight <| Task.succeed arg

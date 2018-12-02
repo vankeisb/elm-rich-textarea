@@ -6,6 +6,7 @@ module Styles exposing
     , empty
     , fromList
     , getStylesAt
+    , insertAt
     )
 
 import Range exposing (Range)
@@ -110,3 +111,10 @@ applyToText s offset styles =
                         ++ [ StyledText buf mkRange curStyles ]
     in
     handleChar s "" offset offset [] []
+
+
+insertAt : Int -> Styles s -> Styles s
+insertAt pos (Styles styles) =
+    styles
+        |> List.map (Tuple.mapFirst (Range.insertAt pos))
+        |> Styles

@@ -11,6 +11,7 @@ import Json.Encode as Encode
 import List exposing (indexedMap)
 import Range exposing (Range, range)
 import String exposing (fromChar, fromInt, toList)
+import Task
 import Test exposing (..)
 import Test.Html.Event as E
 import Test.Html.Query exposing (..)
@@ -20,6 +21,7 @@ import Textarea exposing (..)
 
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
+    | NoOp ( String, Int )
 
 
 type MyStyle
@@ -128,19 +130,30 @@ suite =
         ]
 
 
-update : Highlighter MyStyle -> IT.Msg MyStyle -> Model MyStyle -> Model MyStyle
-update hl msg model =
-    Textarea.update hl msg model
+myUpdateData : Textarea.UpdateData Msg MyStyle
+myUpdateData =
+    { lift = TextareaMsg
+    , onHighlight = asyncEmptyHighlighter
+    }
+
+
+update : Textarea.UpdateData Msg MyStyle -> IT.Msg MyStyle -> Model MyStyle -> Model MyStyle
+update updateData msg model =
+    Textarea.update updateData msg model
         |> Tuple.first
 
 
 updateNoHl =
-    update emptyHighlighter
+    update myUpdateData
 
 
 emptyHighlighter =
     \text ->
         []
+
+
+asyncEmptyHighlighter =
+    \arg -> Task.perform NoOp <| Task.succeed arg
 
 
 renderer : List MyStyle -> List (Html.Attribute Msg)

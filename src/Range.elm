@@ -4,6 +4,7 @@ module Range exposing
     , expand
     , getBounds
     , getFrom
+    , insertAt
     , isCaret
     , move
     , range
@@ -55,3 +56,15 @@ isCaret i (Range from to) =
 move : Int -> Range -> Range
 move i (Range from to) =
     Range (from + i) (to + i)
+
+
+insertAt : Int -> Range -> Range
+insertAt pos (Range from to) =
+    if pos < from then
+        Range (from + 1) (to + 1)
+
+    else if pos <= to then
+        Range from (to + 1)
+
+    else
+        Range from to

@@ -32,7 +32,6 @@ type Msg s
     | GetCharViewport (Result Dom.Error Dom.Element)
     | Scrolled Float Float
     | NoOp
-    | NewStyles (List ( Range, s ))
 
 
 type alias ModelData s =
@@ -44,6 +43,7 @@ type alias ModelData s =
     , focused : Bool
     , viewportBox : Box
     , selectingAt : Maybe Int
+    , highlightId : Int
     }
 
 

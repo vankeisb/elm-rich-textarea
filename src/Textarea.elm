@@ -3,7 +3,9 @@ module Textarea exposing
     , InitData
     , Model
     , Msg
+    , UpdateData
     , attributedRenderer
+    , highlight
     , init
     , subscriptions
     , update
@@ -60,6 +62,7 @@ init initData =
                 , scrollLeft = 0
                 }
             , selectingAt = Nothing
+            , highlightId = 0
             }
     in
     ( Model initialModelData
@@ -265,20 +268,23 @@ computeStylesSync highlighter model =
     ( computeStyles highlighter model, Cmd.none )
 
 
-computeStylesAsync : Highlighter s -> Model s -> ( Model s, Cmd (Msg s) )
-computeStylesAsync highlighter (Model d) =
+computeStylesAsync2 : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
+computeStylesAsync2 updateData ( Model d, cmd ) =
     let
-        task0 =
-            Task.succeed (highlighter d.text)
-
-        task1 =
-            Process.sleep 2013
-                |> Task.andThen (\_ -> task0)
-
-        cmd =
-            Task.perform NewStyles task0
+        model1 =
+            { d | highlightId = d.highlightId + 1 }
     in
-    ( Model d, cmd )
+    ( computeStyledTexts <| Model model1
+    , Cmd.batch
+        [ Cmd.map updateData.lift cmd
+        , updateData.onHighlight ( model1.text, model1.highlightId )
+        ]
+    )
+
+
+liftCmd : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
+liftCmd updateData ( model, cmd ) =
+    ( model, Cmd.map updateData.lift cmd )
 
 
 computeStyles : Highlighter s -> Model s -> Model s
@@ -351,39 +357,64 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Highlighter s -> Msg s -> Model s -> ( Model s, Cmd (Msg s) )
-update hl msg (Model model) =
+highlight : List ( Range, s ) -> Int -> Model s -> ( Model s, Cmd (Msg s) )
+highlight styles highlightId (Model model) =
+    if model.highlightId == highlightId then
+        ( updateStyles styles <| Model model, Cmd.none )
+
+    else
+        ( Model model, Cmd.none )
+
+
+type alias UpdateData m s =
+    { onHighlight : ( String, Int ) -> Cmd m
+    , lift : Msg s -> m
+    }
+
+
+update : UpdateData m s -> Msg s -> Model s -> ( Model s, Cmd m )
+update updateData msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
                 { model
-                    | text =
-                        s
+                    | text = s
+                    , styles =
+                        if start == end && String.length model.text < String.length s then
+                            Styles.insertAt start model.styles
+
+                        else
+                            model.styles
                 }
-                |> computeStylesAsync hl
-                |> setSelection
-                    (Just (Range.range start end))
+                |> noCmd
+                |> setSelection (Just (Range.range start end))
+                |> computeStylesAsync2 updateData
 
         OnKeyDown keyCode start end ->
-            onKey True hl keyCode start end model
+            onKey True keyCode start end model
+                |> computeStylesAsync2 updateData
 
         OnKeyUp keyCode start end ->
-            onKey False hl keyCode start end model
+            onKey False keyCode start end model
+                |> computeStylesAsync2 updateData
 
         MouseDown i ->
             setCaretPos i (Model model)
+                |> liftCmd updateData
 
         MouseUp i ->
             ( Model model
             , Cmd.none
             )
                 |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
+                |> liftCmd updateData
 
         MouseOver i ->
             ( Model model
             , Cmd.none
             )
                 |> updateIfSelecting (expandSelection i)
+                |> liftCmd updateData
 
         MouseOverLine n ->
             ( Model model
@@ -395,6 +426,7 @@ update hl msg (Model model) =
                             |> Maybe.map (\s -> Model m |> expandSelection (s - 1))
                             |> Maybe.withDefault (Model m)
                     )
+                |> liftCmd updateData
 
         MouseUpLine n ->
             ( Model model
@@ -407,24 +439,28 @@ update hl msg (Model model) =
                             |> Maybe.map (setSelectingAt Nothing)
                             |> Maybe.withDefault (Model m)
                     )
+                |> liftCmd updateData
 
         BackgroundClicked ->
             -- place caret at the end of the text
             setCaretPos
                 (String.length model.text)
                 (Model model)
+                |> liftCmd updateData
 
         BackgroundMouseOver ->
             ( Model model
             , Cmd.none
             )
                 |> updateIfSelecting (expandSelection <| String.length model.text)
+                |> liftCmd updateData
 
         BackgroundMouseUp ->
             ( Model model
             , Cmd.none
             )
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
+                |> liftCmd updateData
 
         MouseDownLine lineIndex ->
             -- place caret at the end of the line
@@ -435,6 +471,7 @@ update hl msg (Model model) =
                     )
                 |> Maybe.withDefault
                     ( Model model, Cmd.none )
+                |> liftCmd updateData
 
         Focused (Ok ()) ->
             ( Model
@@ -443,9 +480,11 @@ update hl msg (Model model) =
                 }
             , Cmd.none
             )
+                |> liftCmd updateData
 
         Focused (Err _) ->
             ( Model model, Cmd.none )
+                |> liftCmd updateData
 
         Blurred ->
             ( Model
@@ -455,6 +494,7 @@ update hl msg (Model model) =
                 |> setSelectingAt Nothing
             , Cmd.none
             )
+                |> liftCmd updateData
 
         GetViewportPos element ->
             case element of
@@ -474,9 +514,11 @@ update hl msg (Model model) =
                     , Cmd.none
                     )
                         |> getViewportSize
+                        |> liftCmd updateData
 
                 Err _ ->
                     ( Model model, Cmd.none )
+                        |> liftCmd updateData
 
         GetViewport vp ->
             ( case vp of
@@ -500,6 +542,7 @@ update hl msg (Model model) =
                     Model model
             , Cmd.none
             )
+                |> liftCmd updateData
 
         GetCharViewport element ->
             case element of
@@ -581,9 +624,11 @@ update hl msg (Model model) =
                     ( Model model
                     , setScroll newScrollLeft newScrollTop
                     )
+                        |> liftCmd updateData
 
                 Err _ ->
                     ( Model model, Cmd.none )
+                        |> liftCmd updateData
 
         Scrolled x y ->
             let
@@ -603,12 +648,11 @@ update hl msg (Model model) =
                 }
             , Cmd.none
             )
+                |> liftCmd updateData
 
         NoOp ->
             ( Model model, Cmd.none )
-
-        NewStyles styles ->
-            ( updateStyles styles <| Model model, Cmd.none )
+                |> liftCmd updateData
 
 
 setCaretPos : Int -> Model s -> ( Model s, Cmd (Msg s) )
@@ -629,8 +673,8 @@ expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
-onKey : Bool -> Highlighter s -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
-onKey isDown hl keyCode start end d =
+onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
+onKey isDown keyCode start end d =
     let
         ( newText, newSel ) =
             if keyCode == 9 && not isDown then
@@ -662,10 +706,9 @@ onKey isDown hl keyCode start end d =
     in
     Model
         { d
-            | text =
-                newText
+            | text = newText
         }
-        |> computeStylesAsync hl
+        |> noCmd
         |> getViewportPos
         |> setSelection newSel
 

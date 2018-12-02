@@ -1,7 +1,7 @@
 module RangeTests exposing (suite)
 
 import Expect exposing (Expectation)
-import Range exposing (Range, expand, range)
+import Range exposing (Range, expand, insertAt, range)
 import Test exposing (..)
 
 
@@ -27,5 +27,32 @@ suite =
                 \_ ->
                     expand 12 13
                         |> Expect.equal (range 12 13)
+            ]
+        , describe "insert"
+            [ test "before" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 5
+                        |> Expect.equal (range 14 16)
+            , test "after" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 20
+                        |> Expect.equal (range 13 15)
+            , test "inside" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 14
+                        |> Expect.equal (range 13 16)
+            , test "left boundary" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 13
+                        |> Expect.equal (range 13 16)
+            , test "right boundary" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 15
+                        |> Expect.equal (range 13 16)
             ]
         ]
