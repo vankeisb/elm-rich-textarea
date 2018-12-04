@@ -13,7 +13,6 @@ import Textarea
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
     | TextClicked
-    | AsyncHighlight ( String, Int )
 
 
 type MyStyle
@@ -86,6 +85,7 @@ renderer myStyles =
             []
 
 
+highlighter : String -> List ( Range, MyStyle )
 highlighter text =
     let
         stylify style word =
@@ -129,7 +129,7 @@ update msg model =
             let
                 updateData =
                     { lift = TextareaMsg
-                    , onHighlight = asyncHighlight
+                    , onHighlight = onHighlight
                     }
 
                 ( tm, c ) =
@@ -144,37 +144,6 @@ update msg model =
 
         TextClicked ->
             ( model, Cmd.none )
-
-        AsyncHighlight ( text, id ) ->
-            if modBy 10 id > 5 then
-                -- skip highlighting
-                ( model, Cmd.none )
-
-            else if modBy 10 id > 0 then
-                -- mismatch highlight id
-                let
-                    ( tm, tc ) =
-                        Textarea.highlight (highlighter text) (id - 1) model.textareaModel
-                in
-                ( { model
-                    | textareaModel =
-                        tm
-                  }
-                , Cmd.map TextareaMsg tc
-                )
-
-            else
-                -- new highlight
-                let
-                    ( tm, tc ) =
-                        Textarea.highlight (highlighter text) id model.textareaModel
-                in
-                ( { model
-                    | textareaModel =
-                        tm
-                  }
-                , Cmd.map TextareaMsg tc
-                )
 
 
 subscriptions : Model -> Sub Msg
@@ -194,6 +163,17 @@ main =
         }
 
 
-asyncHighlight : ( String, Int ) -> Cmd Msg
-asyncHighlight arg =
-    Task.perform AsyncHighlight <| Task.succeed arg
+onHighlight : (List ( Range, MyStyle ) -> Int -> Cmd Msg) -> ( String, Int ) -> Cmd Msg
+onHighlight return ( text, id ) =
+    -- TODO try another version using ports
+    if modBy 20 id > 10 then
+        -- skip highlighting
+        Cmd.none
+
+    else if modBy 20 id > 0 then
+        -- mismatch highlight id
+        return (highlighter text) (id - 1)
+
+    else
+        -- new highlight
+        return (highlighter text) id

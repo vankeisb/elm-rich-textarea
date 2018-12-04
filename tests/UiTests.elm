@@ -152,8 +152,9 @@ emptyHighlighter =
         []
 
 
+asyncEmptyHighlighter : (List ( Range, s ) -> Int -> Cmd m) -> ( String, Int ) -> Cmd m
 asyncEmptyHighlighter =
-    \arg -> Task.perform NoOp <| Task.succeed arg
+    \return ( _, id ) -> return [] id
 
 
 renderer : List MyStyle -> List (Html.Attribute Msg)

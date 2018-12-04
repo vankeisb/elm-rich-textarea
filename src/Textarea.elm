@@ -5,7 +5,6 @@ module Textarea exposing
     , Msg
     , UpdateData
     , attributedRenderer
-    , highlight
     , init
     , subscriptions
     , update
@@ -269,16 +268,15 @@ computeStylesSync highlighter model =
 
 
 computeStylesAsync2 : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
-computeStylesAsync2 updateData ( Model d, cmd ) =
-    let
-        model1 =
-            { d | highlightId = d.highlightId + 1 }
-    in
-    ( computeStyledTexts <| Model model1
+computeStylesAsync2 updateData ( Model model, cmd ) =
+    ( computeStyledTexts <| Model model
     , Cmd.batch
-        [ Cmd.map updateData.lift cmd
-        , updateData.onHighlight ( model1.text, model1.highlightId )
+        [ cmd
+
+        -- TODO debounce RequestHighlight
+        , Task.perform RequestHighlight <| Task.succeed model.text
         ]
+        |> Cmd.map updateData.lift
     )
 
 
@@ -357,17 +355,8 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-highlight : List ( Range, s ) -> Int -> Model s -> ( Model s, Cmd (Msg s) )
-highlight styles highlightId (Model model) =
-    if model.highlightId == highlightId then
-        ( updateStyles styles <| Model model, Cmd.none )
-
-    else
-        ( Model model, Cmd.none )
-
-
 type alias UpdateData m s =
-    { onHighlight : ( String, Int ) -> Cmd m
+    { onHighlight : (List ( Range, s ) -> Int -> Cmd m) -> ( String, Int ) -> Cmd m
     , lift : Msg s -> m
     }
 
@@ -653,6 +642,26 @@ update updateData msg (Model model) =
         NoOp ->
             ( Model model, Cmd.none )
                 |> liftCmd updateData
+
+        RequestHighlight text ->
+            let
+                model1 =
+                    { model | highlightId = model.highlightId + 1 }
+
+                return =
+                    \styles id ->
+                        Task.succeed ( styles, id )
+                            |> Task.perform NewHighlight
+                            |> Cmd.map updateData.lift
+            in
+            ( Model model1, updateData.onHighlight return ( text, model1.highlightId ) )
+
+        NewHighlight ( styles, highlightId ) ->
+            if model.highlightId == highlightId then
+                ( updateStyles styles <| Model model, Cmd.none )
+
+            else
+                ( Model model, Cmd.none )
 
 
 setCaretPos : Int -> Model s -> ( Model s, Cmd (Msg s) )

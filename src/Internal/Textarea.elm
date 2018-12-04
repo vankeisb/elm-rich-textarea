@@ -32,6 +32,8 @@ type Msg s
     | GetCharViewport (Result Dom.Error Dom.Element)
     | Scrolled Float Float
     | NoOp
+    | RequestHighlight String
+    | NewHighlight ( List ( Range, s ), Int )
 
 
 type alias ModelData s =
