@@ -1,6 +1,7 @@
 module Range exposing
     ( Range
     , contains
+    , empty
     , expand
     , getBounds
     , getFrom
@@ -53,18 +54,23 @@ isCaret i (Range from to) =
     (from == to) && (from == i)
 
 
+empty : Range -> Bool
+empty (Range from to) =
+    from == to
+
+
 move : Int -> Range -> Range
 move i (Range from to) =
     Range (from + i) (to + i)
 
 
-insertAt : Int -> Range -> Range
-insertAt pos (Range from to) =
+insertAt : Int -> Int -> Range -> Range
+insertAt pos count (Range from to) =
     if pos < from then
-        Range (from + 1) (to + 1)
+        range (from + count) (to + count)
 
-    else if pos <= to then
-        Range from (to + 1)
+    else if pos <= to + 1 then
+        range from (to + count)
 
     else
-        Range from to
+        range from to

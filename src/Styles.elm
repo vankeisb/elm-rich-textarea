@@ -113,8 +113,9 @@ applyToText s offset styles =
     handleChar s "" offset offset [] []
 
 
-insertAt : Int -> Styles s -> Styles s
-insertAt pos (Styles styles) =
+insertAt : Int -> Int -> Styles s -> Styles s
+insertAt pos count (Styles styles) =
     styles
-        |> List.map (Tuple.mapFirst (Range.insertAt pos))
+        |> List.map (Tuple.mapFirst (Range.insertAt pos count))
+        |> List.filter (not << Range.empty << Tuple.first)
         |> Styles

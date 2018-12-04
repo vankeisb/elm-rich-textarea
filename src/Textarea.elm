@@ -369,8 +369,12 @@ update updateData msg (Model model) =
                 { model
                     | text = s
                     , styles =
-                        if start == end && String.length model.text < String.length s then
-                            Styles.insertAt start model.styles
+                        let
+                            inserted =
+                                String.length s - String.length model.text
+                        in
+                        if start == end && inserted /= 0 then
+                            Styles.insertAt start inserted model.styles
 
                         else
                             model.styles
