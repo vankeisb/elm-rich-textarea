@@ -80,13 +80,23 @@ suite =
                 \_ ->
                     range 13 15
                         |> insertAt 16 -1
+                        |> Expect.equal (range 13 15)
+            , test "right boundary 2" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 15 -1
+                        |> Expect.equal (range 13 15)
+            , test "right boundary 3" <|
+                \_ ->
+                    range 13 15
+                        |> insertAt 14 -1
                         |> Expect.equal (range 13 14)
             , test "vanish" <|
                 \_ ->
                     range 13 14
                         |> insertAt 14 -1
                         |> empty
-                        |> Expect.equal True
+                        |> Expect.equal False
             , test "vanish 2" <|
                 \_ ->
                     range 13 14

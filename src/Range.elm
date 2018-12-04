@@ -69,8 +69,12 @@ insertAt pos count (Range from to) =
     if pos < from then
         range (from + count) (to + count)
 
-    else if pos <= to + 1 then
+    else if count > 0 && pos <= to + 1 then
         range from (to + count)
+
+    else if count < 0 && pos <= to - 1 then
+        range from (to + count)
+            |> Debug.log ("FW " ++ String.fromInt pos)
 
     else
         range from to
