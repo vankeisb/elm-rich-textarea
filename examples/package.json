@@ -1,0 +1,11 @@
+{
+  "name": "examples",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "elm make Main.elm --output=./elm.js",
+    "format": "elm-format --yes src"
+  },
+  "devDependencies": {
+    "elm": "0.19"
+  }
+}
