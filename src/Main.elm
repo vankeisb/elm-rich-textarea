@@ -32,8 +32,6 @@ init idPrefix =
             Textarea.init
                 { idPrefix = "my-ta"
                 , highlighter = highlighter
-
-                --                , initialText = "foo\nbar"
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 }
     in
@@ -166,14 +164,4 @@ main =
 onHighlight : (List ( Range, MyStyle ) -> Int -> Cmd Msg) -> ( String, Int ) -> Cmd Msg
 onHighlight return ( text, id ) =
     -- TODO try another version using ports
-    --    if modBy 20 id > 10 then
-    --        -- skip highlighting
-    --        Cmd.none
-    --
-    --    else if modBy 20 id > 0 then
-    --        -- mismatch highlight id
-    --        return (highlighter text) (id - 1)
-    --
-    --    else
-    -- new highlight
     return (highlighter text) id
