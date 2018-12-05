@@ -166,14 +166,14 @@ main =
 onHighlight : (List ( Range, MyStyle ) -> Int -> Cmd Msg) -> ( String, Int ) -> Cmd Msg
 onHighlight return ( text, id ) =
     -- TODO try another version using ports
-    if modBy 20 id > 10 then
-        -- skip highlighting
-        Cmd.none
-
-    else if modBy 20 id > 0 then
-        -- mismatch highlight id
-        return (highlighter text) (id - 1)
-
-    else
-        -- new highlight
-        return (highlighter text) id
+    --    if modBy 20 id > 10 then
+    --        -- skip highlighting
+    --        Cmd.none
+    --
+    --    else if modBy 20 id > 0 then
+    --        -- mismatch highlight id
+    --        return (highlighter text) (id - 1)
+    --
+    --    else
+    -- new highlight
+    return (highlighter text) id

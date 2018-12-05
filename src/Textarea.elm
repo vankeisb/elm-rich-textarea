@@ -14,6 +14,7 @@ module Textarea exposing
 import Array
 import Browser
 import Browser.Dom as Dom
+import Debounce
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -62,6 +63,7 @@ init initData =
                 }
             , selectingAt = Nothing
             , highlightId = 0
+            , debounce = Debounce.init
             }
     in
     ( Model initialModelData
@@ -269,12 +271,14 @@ computeStylesSync highlighter model =
 
 computeStylesAsync2 : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
 computeStylesAsync2 updateData ( Model model, cmd ) =
-    ( computeStyledTexts <| Model model
+    let
+        ( debounce, cmd1 ) =
+            Debounce.push debounceConfig model.text model.debounce
+    in
+    ( computeStyledTexts <| Model { model | debounce = debounce }
     , Cmd.batch
         [ cmd
-
-        -- TODO debounce RequestHighlight
-        , Task.perform RequestHighlight <| Task.succeed model.text
+        , cmd1
         ]
         |> Cmd.map updateData.lift
     )
@@ -666,6 +670,30 @@ update updateData msg (Model model) =
 
             else
                 ( Model model, Cmd.none )
+
+        DebounceMsg msg1 ->
+            let
+                save text =
+                    Task.perform RequestHighlight <| Task.succeed text
+
+                ( debounce, cmd ) =
+                    Debounce.update
+                        debounceConfig
+                        (Debounce.takeLast save)
+                        msg1
+                        model.debounce
+            in
+            ( Model { model | debounce = debounce }
+            , cmd
+            )
+                |> liftCmd updateData
+
+
+debounceConfig : Debounce.Config (Msg s)
+debounceConfig =
+    { strategy = Debounce.later 1000
+    , transform = DebounceMsg
+    }
 
 
 setCaretPos : Int -> Model s -> ( Model s, Cmd (Msg s) )

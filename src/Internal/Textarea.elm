@@ -8,6 +8,7 @@ module Internal.Textarea exposing
 
 import Array
 import Browser.Dom as Dom
+import Debounce
 import Range exposing (Range)
 import Styles exposing (StyledText, Styles)
 
@@ -34,6 +35,7 @@ type Msg s
     | NoOp
     | RequestHighlight String
     | NewHighlight ( List ( Range, s ), Int )
+    | DebounceMsg Debounce.Msg
 
 
 type alias ModelData s =
@@ -46,6 +48,7 @@ type alias ModelData s =
     , viewportBox : Box
     , selectingAt : Maybe Int
     , highlightId : Int
+    , debounce : Debounce.Debounce String
     }
 
 
