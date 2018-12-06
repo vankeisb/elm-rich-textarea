@@ -264,11 +264,6 @@ type alias Highlighter s =
     String -> List ( Range, s )
 
 
-computeStylesSync : Highlighter s -> Model s -> ( Model s, Cmd (Msg s) )
-computeStylesSync highlighter model =
-    ( computeStyles highlighter model, Cmd.none )
-
-
 computeStylesAsync2 : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
 computeStylesAsync2 updateData ( Model model, cmd ) =
     let
