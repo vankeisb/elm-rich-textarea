@@ -264,8 +264,8 @@ type alias Highlighter s =
     String -> List ( Range, s )
 
 
-computeStylesAsync2 : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
-computeStylesAsync2 updateData ( Model model, cmd ) =
+computeStylesAsync : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
+computeStylesAsync updateData ( Model model, cmd ) =
     let
         ( debounce, cmd1 ) =
             Debounce.push debounceConfig model.text model.debounce
@@ -380,15 +380,15 @@ update updateData msg (Model model) =
                 }
                 |> noCmd
                 |> setSelection (Just (Range.range start end))
-                |> computeStylesAsync2 updateData
+                |> computeStylesAsync updateData
 
         OnKeyDown keyCode start end ->
             onKey True keyCode start end model
-                |> computeStylesAsync2 updateData
+                |> computeStylesAsync updateData
 
         OnKeyUp keyCode start end ->
             onKey False keyCode start end model
-                |> computeStylesAsync2 updateData
+                |> computeStylesAsync updateData
 
         MouseDown i ->
             setCaretPos i (Model model)
