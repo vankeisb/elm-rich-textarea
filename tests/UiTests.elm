@@ -152,9 +152,9 @@ emptyHighlighter =
         []
 
 
-asyncEmptyHighlighter : (List ( Range, s ) -> Int -> Cmd m) -> ( String, Int ) -> Cmd m
+asyncEmptyHighlighter : (List ( Range, s ) -> Cmd m) -> String -> Cmd m
 asyncEmptyHighlighter =
-    \return ( _, id ) -> return [] id
+    \return _ -> return []
 
 
 renderer : List MyStyle -> List (Html.Attribute Msg)

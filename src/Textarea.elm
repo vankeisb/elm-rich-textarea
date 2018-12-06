@@ -355,7 +355,7 @@ updateIfSelecting fun ( Model model, c ) =
 
 
 type alias UpdateData m s =
-    { onHighlight : (List ( Range, s ) -> Int -> Cmd m) -> ( String, Int ) -> Cmd m
+    { onHighlight : (List ( Range, s ) -> Cmd m) -> String -> Cmd m
     , lift : Msg s -> m
     }
 
@@ -652,14 +652,14 @@ update updateData msg (Model model) =
                     { model | highlightId = model.highlightId + 1 }
 
                 return =
-                    \styles id ->
-                        Task.succeed ( styles, id )
-                            |> Task.perform NewHighlight
+                    \styles ->
+                        Task.succeed styles
+                            |> Task.perform (NewHighlight model1.highlightId)
                             |> Cmd.map updateData.lift
             in
-            ( Model model1, updateData.onHighlight return ( text, model1.highlightId ) )
+            ( Model model1, updateData.onHighlight return text )
 
-        NewHighlight ( styles, highlightId ) ->
+        NewHighlight highlightId styles ->
             if model.highlightId == highlightId then
                 ( updateStyles styles <| Model model, Cmd.none )
 

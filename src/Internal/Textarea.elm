@@ -34,7 +34,7 @@ type Msg s
     | Scrolled Float Float
     | NoOp
     | RequestHighlight String
-    | NewHighlight ( List ( Range, s ), Int )
+    | NewHighlight Int (List ( Range, s ))
     | DebounceMsg Debounce.Msg
 
 

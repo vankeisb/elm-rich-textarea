@@ -161,7 +161,7 @@ main =
         }
 
 
-onHighlight : (List ( Range, MyStyle ) -> Int -> Cmd Msg) -> ( String, Int ) -> Cmd Msg
-onHighlight return ( text, id ) =
+onHighlight : (List ( Range, MyStyle ) -> Cmd Msg) -> String -> Cmd Msg
+onHighlight return text =
     -- TODO try another version using ports
-    return (highlighter text) id
+    return (highlighter text)
