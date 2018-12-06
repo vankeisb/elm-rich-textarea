@@ -14,7 +14,15 @@
 <body>
 <div id="app"></div>
 <script>
-    Elm.Main.init({node: document.getElementById("app")});
+    var app = Elm.Main.init({node: document.getElementById("app")})
+
+    app.ports.delay.subscribe(function(value) {
+        console.log("delay highlight",value)
+        setTimeout(function() {
+            console.log("delayed highlight",value)
+            app.ports.delayed.send(value)
+        },1000)
+    })
 </script>
 </body>
 </html>
