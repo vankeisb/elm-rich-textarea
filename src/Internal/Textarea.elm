@@ -23,9 +23,10 @@ type Msg s
     | MouseDownLine Int
     | MouseOverLine Int
     | MouseUpLine Int
-    | BackgroundClicked
+    | BackgroundMouseDown
     | BackgroundMouseOver
     | BackgroundMouseUp
+    | BackgroundMouseLeft
     | Focused (Result Dom.Error ())
     | Blurred
     | GetViewportPos (Result Dom.Error Dom.Element)

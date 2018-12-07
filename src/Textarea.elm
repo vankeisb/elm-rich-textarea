@@ -166,9 +166,10 @@ view lift renderer (Model d) =
             , style "white-space" "pre"
             , style "overflow" "auto"
             , id <| viewportId d
-            , mouseEvent "mousedown" (\_ -> lift <| BackgroundClicked)
+            , mouseEvent "mousedown" (\_ -> lift <| BackgroundMouseDown)
             , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
             , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
+            , mouseEvent "mouseleave" (\_ -> lift <| BackgroundMouseLeft)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -443,7 +444,18 @@ update updateData msg (Model model) =
                     )
                 |> liftCmd updateData
 
-        BackgroundClicked ->
+        MouseDownLine lineIndex ->
+            -- place caret at the end of the line
+            lineSize lineIndex model.text
+                |> Maybe.map
+                    (\s ->
+                        setCaretPos (s - 1) (Model model)
+                    )
+                |> Maybe.withDefault
+                    ( Model model, Cmd.none )
+                |> liftCmd updateData
+
+        BackgroundMouseDown ->
             -- place caret at the end of the text
             setCaretPos
                 (String.length model.text)
@@ -464,15 +476,10 @@ update updateData msg (Model model) =
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
                 |> liftCmd updateData
 
-        MouseDownLine lineIndex ->
-            -- place caret at the end of the line
-            lineSize lineIndex model.text
-                |> Maybe.map
-                    (\s ->
-                        setCaretPos (s - 1) (Model model)
-                    )
-                |> Maybe.withDefault
-                    ( Model model, Cmd.none )
+        BackgroundMouseLeft ->
+            ( Model model |> setSelectingAt Nothing
+            , Cmd.none
+            )
                 |> liftCmd updateData
 
         Focused (Ok ()) ->
