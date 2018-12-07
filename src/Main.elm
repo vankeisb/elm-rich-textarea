@@ -161,7 +161,6 @@ main =
         }
 
 
-onHighlight : (List ( Range, MyStyle ) -> Cmd Msg) -> String -> Cmd Msg
+onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
 onHighlight return text =
-    -- TODO try another version using ports
     return (highlighter text)

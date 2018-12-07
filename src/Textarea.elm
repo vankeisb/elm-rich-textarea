@@ -3,6 +3,7 @@ module Textarea exposing
     , InitData
     , Model
     , Msg
+    , ReturnStyles
     , UpdateData
     , attributedRenderer
     , init
@@ -99,6 +100,7 @@ charId d i =
    Applies styles to a string at a given offset. Selection
    range is also passed for drawing the selection.
 -}
+-- TODO simplify
 
 
 type alias Renderer s m =
@@ -111,6 +113,10 @@ type alias Renderer s m =
 
 devMode =
     False
+
+
+
+-- TODO introduce ViewData
 
 
 view : (Msg s -> m) -> Renderer s m -> Model s -> Html m
@@ -354,10 +360,14 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-type alias UpdateData m s =
-    { onHighlight : (List ( Range, s ) -> Cmd m) -> String -> Cmd m
-    , lift : Msg s -> m
+type alias UpdateData msg s =
+    { onHighlight : ReturnStyles msg s -> String -> Cmd msg
+    , lift : Msg s -> msg
     }
+
+
+type alias ReturnStyles msg s =
+    List ( Range, s ) -> Cmd msg
 
 
 update : UpdateData m s -> Msg s -> Model s -> ( Model s, Cmd m )

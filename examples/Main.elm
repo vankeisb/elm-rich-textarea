@@ -16,7 +16,7 @@ import Textarea
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
     | TextClicked
-    | DelayHighlight (List ( Range, MyStyle ) -> Cmd Msg) (List ( Range, MyStyle ))
+    | DelayHighlight (Textarea.ReturnStyles Msg MyStyle) (List ( Range, MyStyle ))
     | UpdateHighlight (List ( Range, MyStyle ))
 
 
@@ -189,7 +189,7 @@ main =
         }
 
 
-onHighlight : (List ( Range, MyStyle ) -> Cmd Msg) -> String -> Cmd Msg
+onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
 onHighlight return text =
     Task.succeed (highlighter text)
         |> Task.perform (DelayHighlight return)
@@ -200,11 +200,6 @@ delayHighlight list =
     list
         |> encodeHighlight
         |> delay
-
-
-
--- TODO hide id in 'return' function
--- TODO use port for highlighting
 
 
 port delay : E.Value -> Cmd msg

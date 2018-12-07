@@ -152,7 +152,7 @@ emptyHighlighter =
         []
 
 
-asyncEmptyHighlighter : (List ( Range, s ) -> Cmd m) -> String -> Cmd m
+asyncEmptyHighlighter : ReturnStyles msg s -> String -> Cmd msg
 asyncEmptyHighlighter =
     \return _ -> return []
 
