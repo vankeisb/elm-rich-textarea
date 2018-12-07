@@ -1,9 +1,12 @@
-module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, renderer, subscriptions, update, view)
+port module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, renderer, subscriptions, update, view)
 
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Json.Decode as D
+import Json.Encode as E
+import Platform.Cmd exposing (Cmd)
 import Range exposing (Range)
 import Styles
 import Task
@@ -13,6 +16,8 @@ import Textarea
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
     | TextClicked
+    | DelayHighlight (Textarea.ReturnStyles Msg MyStyle) (List ( Range, MyStyle ))
+    | UpdateHighlight (List ( Range, MyStyle ))
 
 
 type MyStyle
@@ -22,6 +27,7 @@ type MyStyle
 
 type alias Model =
     { textareaModel : Textarea.Model MyStyle
+    , returnHighlight : Maybe (List ( Range, MyStyle ) -> Cmd Msg)
     }
 
 
@@ -36,6 +42,7 @@ init idPrefix =
                 }
     in
     ( { textareaModel = m
+      , returnHighlight = Nothing
       }
     , Cmd.map TextareaMsg c
     )
@@ -143,11 +150,32 @@ update msg model =
         TextClicked ->
             ( model, Cmd.none )
 
+        DelayHighlight return list ->
+            if model.returnHighlight == Nothing then
+                ( { model | returnHighlight = Just return }
+                , delayHighlight list
+                )
+
+            else
+                ( model, Cmd.none )
+
+        UpdateHighlight list ->
+            case model.returnHighlight of
+                Just return ->
+                    ( { model | returnHighlight = Nothing }
+                    , return list
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.map TextareaMsg <|
-        Textarea.subscriptions model.textareaModel
+    Sub.batch
+        [ delayed (UpdateHighlight << decodeHighlight)
+        , Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
+        ]
 
 
 main =
@@ -163,4 +191,88 @@ main =
 
 onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
 onHighlight return text =
-    return (highlighter text)
+    Task.succeed (highlighter text)
+        |> Task.perform (DelayHighlight return)
+
+
+delayHighlight : List ( Range, MyStyle ) -> Cmd Msg
+delayHighlight list =
+    list
+        |> encodeHighlight
+        |> delay
+
+
+port delay : E.Value -> Cmd msg
+
+
+port delayed : (E.Value -> msg) -> Sub msg
+
+
+decodeHighlight : E.Value -> List ( Range, MyStyle )
+decodeHighlight value =
+    value
+        |> D.decodeValue highlightDecoder
+        |> Result.withDefault []
+
+
+encodeHighlight : List ( Range, MyStyle ) -> E.Value
+encodeHighlight list =
+    list
+        |> E.list
+            (\( range, mystyle ) ->
+                E.object
+                    [ ( "range", encodeRange range )
+                    , ( "mystyle", encodeMyStyle mystyle )
+                    ]
+            )
+
+
+highlightDecoder : D.Decoder (List ( Range, MyStyle ))
+highlightDecoder =
+    D.list <|
+        D.map2 Tuple.pair
+            (D.field "range" rangeDecoder)
+            (D.field "mystyle" myStyleDecoder)
+
+
+rangeDecoder : D.Decoder Range
+rangeDecoder =
+    D.map2 Range.range (D.index 0 D.int) (D.index 1 D.int)
+
+
+encodeRange : Range -> E.Value
+encodeRange range =
+    E.list E.int <| tupleAsList <| Range.getBounds range
+
+
+tupleAsList : ( a, a ) -> List a
+tupleAsList ( a, b ) =
+    [ a, b ]
+
+
+myStyleDecoder : D.Decoder MyStyle
+myStyleDecoder =
+    D.map fromString D.string
+
+
+fromString : String -> MyStyle
+fromString style =
+    case style of
+        "Keyword" ->
+            Keyword
+
+        "Identifier" ->
+            Identifier
+
+        _ ->
+            Identifier
+
+
+encodeMyStyle : MyStyle -> E.Value
+encodeMyStyle style =
+    case style of
+        Keyword ->
+            E.string "Keyword"
+
+        Identifier ->
+            E.string "Identifier"
