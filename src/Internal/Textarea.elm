@@ -27,6 +27,7 @@ type Msg s
     | BackgroundMouseOver
     | BackgroundMouseUp
     | BackgroundMouseLeft
+    | BackgroundMouseEnter Int
     | Focused (Result Dom.Error ())
     | Blurred
     | GetViewportPos (Result Dom.Error Dom.Element)

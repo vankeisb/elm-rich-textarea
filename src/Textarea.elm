@@ -165,11 +165,13 @@ view lift renderer (Model d) =
             , style "bottom" "0"
             , style "white-space" "pre"
             , style "overflow" "auto"
+            , style "user-select" "none"
             , id <| viewportId d
             , mouseEvent "mousedown" (\_ -> lift <| BackgroundMouseDown)
             , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
             , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , mouseEvent "mouseleave" (\_ -> lift <| BackgroundMouseLeft)
+            , mouseEnterEvent (\buttons -> lift <| BackgroundMouseEnter buttons)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -481,6 +483,18 @@ update updateData msg (Model model) =
             , Cmd.none
             )
                 |> liftCmd updateData
+
+        BackgroundMouseEnter buttons ->
+            if 1 == buttons then
+                ( Model model |> setSelectingAt (Just 0)
+                , Cmd.none
+                )
+                    |> liftCmd updateData
+
+            else
+                ( Model model
+                , Cmd.none
+                )
 
         Focused (Ok ()) ->
             ( Model
@@ -869,6 +883,19 @@ mouseEvent name createMsg =
             )
             (Json.at [ "offsetX" ] Json.float)
             (Json.at [ "target", "clientWidth" ] Json.int)
+
+
+mouseEnterEvent : (Int -> msg) -> Attribute msg
+mouseEnterEvent createMsg =
+    custom "mouseenter" <|
+        Json.map
+            (\buttons ->
+                { message = createMsg buttons
+                , preventDefault = True
+                , stopPropagation = True
+                }
+            )
+            (Json.at [ "buttons" ] Json.int)
 
 
 
