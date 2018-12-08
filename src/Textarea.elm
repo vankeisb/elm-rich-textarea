@@ -26,7 +26,7 @@ import Process
 import Range exposing (Range)
 import Styles exposing (Styles)
 import Task
-import TextUtil exposing (wordRangeAt)
+import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
 
 
@@ -439,9 +439,10 @@ update updateData msg (Model model) =
 
             else if count == 3.0 then
                 ( Model model
+                    |> expandLineSelection i
                 , Cmd.none
                 )
-                    |> Debug.log "FW line"
+                    |> liftCmd updateData
 
             else
                 ( Model model
@@ -777,6 +778,19 @@ expandWordSelection pos (Model d) =
     Model
         { d
             | selection = Just wordSelection
+        }
+
+
+expandLineSelection : Int -> Model s -> Model s
+expandLineSelection pos (Model d) =
+    let
+        lineSelection =
+            lineRangeAt pos d.text
+                |> Maybe.withDefault (Range.range pos pos)
+    in
+    Model
+        { d
+            | selection = Just lineSelection
         }
 
 

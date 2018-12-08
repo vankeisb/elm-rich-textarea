@@ -3,7 +3,7 @@ module TextUtilTests exposing (suite)
 import Expect exposing (Expectation)
 import Range exposing (range)
 import Test exposing (..)
-import TextUtil exposing (wordRangeAt)
+import TextUtil exposing (lineRangeAt, wordRangeAt)
 
 
 suite : Test
@@ -45,7 +45,7 @@ suite =
                     "foo bar gnu"
                         |> wordRangeAt 9
                         |> Expect.equal (Just <| range 8 11)
-            , test "one car word" <|
+            , test "one char word" <|
                 \_ ->
                     "foo b gnu"
                         |> wordRangeAt 4
@@ -60,5 +60,22 @@ suite =
                     "foo + gnu"
                         |> wordRangeAt 4
                         |> Expect.equal (Just <| range 4 5)
+            ]
+        , describe "lines"
+            [ test "empty" <|
+                \_ ->
+                    ""
+                        |> lineRangeAt 0
+                        |> Expect.equal Nothing
+            , test "only line" <|
+                \_ ->
+                    "line"
+                        |> lineRangeAt 0
+                        |> Expect.equal (Just <| range 0 4)
+            , test "inside line" <|
+                \_ ->
+                    "foo\nbar\ngnu"
+                        |> lineRangeAt 5
+                        |> Expect.equal (Just <| range 4 7)
             ]
         ]

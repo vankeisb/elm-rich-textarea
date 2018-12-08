@@ -1,10 +1,20 @@
-module TextUtil exposing (wordRangeAt)
+module TextUtil exposing (lineRangeAt, wordRangeAt)
 
 import Range exposing (Range, range)
 
 
 wordRangeAt : Int -> String -> Maybe Range
-wordRangeAt pos text =
+wordRangeAt =
+    delimitedRangeAt isWhitespace
+
+
+lineRangeAt : Int -> String -> Maybe Range
+lineRangeAt =
+    delimitedRangeAt isNewline
+
+
+delimitedRangeAt : (Char -> Bool) -> Int -> String -> Maybe Range
+delimitedRangeAt isDelim pos text =
     let
         indexed =
             text
@@ -13,7 +23,7 @@ wordRangeAt pos text =
 
         left =
             indexed
-                |> List.filter (\( i, c ) -> i < pos && isWhitespace c)
+                |> List.filter (\( i, c ) -> i < pos && isDelim c)
                 |> List.map Tuple.first
                 |> List.reverse
                 |> List.head
@@ -21,7 +31,7 @@ wordRangeAt pos text =
 
         right =
             indexed
-                |> List.filter (\( i, c ) -> i >= pos && isWhitespace c)
+                |> List.filter (\( i, c ) -> i >= pos && isDelim c)
                 |> List.map Tuple.first
                 |> List.head
                 |> Maybe.withDefault (String.length text)
@@ -38,7 +48,12 @@ wordRangeAt pos text =
 
 isWhitespace : Char -> Bool
 isWhitespace c =
-    c == ' ' || c == '\n' || c == '\t'
+    c == ' ' || c == '\t' || isNewline c
+
+
+isNewline : Char -> Bool
+isNewline c =
+    c == '\n'
 
 
 maxIndexWith : (b -> Bool) -> List ( Int, b ) -> Int
