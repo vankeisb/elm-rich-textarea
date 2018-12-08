@@ -23,6 +23,7 @@ type Msg s
     | MouseDownLine Int
     | MouseOverLine Int
     | MouseUpLine Int
+    | MouseClicks Int Float
     | BackgroundMouseDown
     | BackgroundMouseOver
     | BackgroundMouseUp

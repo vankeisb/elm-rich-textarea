@@ -26,6 +26,7 @@ import Process
 import Range exposing (Range)
 import Styles exposing (Styles)
 import Task
+import TextUtil exposing (wordRangeAt)
 import Time exposing (Posix)
 
 
@@ -420,6 +421,32 @@ update updateData msg (Model model) =
             )
                 |> updateIfSelecting (expandSelection i)
                 |> liftCmd updateData
+
+        MouseClicks i count ->
+            if count == 1.0 then
+                Model model
+                    -- TODO simplify
+                    |> setCaretPos i
+                    |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
+                    |> liftCmd updateData
+
+            else if count == 2.0 then
+                ( Model model
+                , Cmd.none
+                )
+                    |> setSelection (wordRangeAt i model.text)
+                    |> liftCmd updateData
+
+            else if count == 3.0 then
+                ( Model model
+                , Cmd.none
+                )
+                    |> Debug.log "FW line"
+
+            else
+                ( Model model
+                , Cmd.none
+                )
 
         MouseOverLine n ->
             ( Model model
@@ -898,6 +925,21 @@ mouseEnterEvent createMsg =
             (Json.at [ "buttons" ] Json.int)
 
 
+mouseClickEvent : (Int -> Float -> msg) -> Attribute msg
+mouseClickEvent createMsg =
+    custom "click" <|
+        Json.map3
+            (\offsetX w detail ->
+                { message = createMsg (adjustIndex offsetX w) detail
+                , preventDefault = True
+                , stopPropagation = True
+                }
+            )
+            (Json.at [ "offsetX" ] Json.float)
+            (Json.at [ "target", "clientWidth" ] Json.int)
+            (Json.at [ "detail" ] Json.float)
+
+
 
 -- place caret at index i or i+1, depending
 -- on the location of the click inside the
@@ -944,6 +986,7 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
               , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
               , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
               , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
+              , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
               ]
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]
