@@ -768,30 +768,27 @@ expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
-expandWordSelection : Int -> Model s -> Model s
-expandWordSelection pos (Model d) =
+expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s -> Model s
+expanSelectionWith fun pos (Model d) =
     let
-        wordSelection =
-            wordRangeAt pos d.text
+        selection =
+            fun pos d.text
                 |> Maybe.withDefault (Range.range pos pos)
     in
     Model
         { d
-            | selection = Just wordSelection
+            | selection = Just selection
         }
+
+
+expandWordSelection : Int -> Model s -> Model s
+expandWordSelection =
+    expanSelectionWith wordRangeAt
 
 
 expandLineSelection : Int -> Model s -> Model s
-expandLineSelection pos (Model d) =
-    let
-        lineSelection =
-            lineRangeAt pos d.text
-                |> Maybe.withDefault (Range.range pos pos)
-    in
-    Model
-        { d
-            | selection = Just lineSelection
-        }
+expandLineSelection =
+    expanSelectionWith lineRangeAt
 
 
 onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
