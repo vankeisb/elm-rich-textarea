@@ -425,16 +425,16 @@ update updateData msg (Model model) =
         MouseClicks i count ->
             if count == 1.0 then
                 Model model
-                    -- TODO simplify
+                    -- TODO simplify?
                     |> setCaretPos i
                     |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
                     |> liftCmd updateData
 
             else if count == 2.0 then
                 ( Model model
+                    |> expandWordSelection i
                 , Cmd.none
                 )
-                    |> setSelection (wordRangeAt i model.text)
                     |> liftCmd updateData
 
             else if count == 3.0 then
@@ -765,6 +765,19 @@ setSelectingAt at (Model d) =
 expandSelection : Int -> Model s -> Model s
 expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
+
+
+expandWordSelection : Int -> Model s -> Model s
+expandWordSelection pos (Model d) =
+    let
+        wordSelection =
+            wordRangeAt pos d.text
+                |> Maybe.withDefault (Range.range pos pos)
+    in
+    Model
+        { d
+            | selection = Just wordSelection
+        }
 
 
 onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
