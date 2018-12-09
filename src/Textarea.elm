@@ -26,6 +26,7 @@ import Process
 import Range exposing (Range)
 import Styles exposing (Styles)
 import Task
+import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
 
 
@@ -165,10 +166,13 @@ view lift renderer (Model d) =
             , style "bottom" "0"
             , style "white-space" "pre"
             , style "overflow" "auto"
+            , style "user-select" "none"
             , id <| viewportId d
-            , mouseEvent "mousedown" (\_ -> lift <| BackgroundClicked)
+            , mouseEvent "mousedown" (\_ -> lift <| BackgroundMouseDown)
             , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
             , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
+            , mouseEvent "mouseleave" (\_ -> lift <| BackgroundMouseLeft)
+            , mouseEnterEvent (\buttons -> lift <| BackgroundMouseEnter buttons)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -418,6 +422,33 @@ update updateData msg (Model model) =
                 |> updateIfSelecting (expandSelection i)
                 |> liftCmd updateData
 
+        MouseClicks i count ->
+            if count == 1.0 then
+                Model model
+                    -- TODO simplify?
+                    |> setCaretPos i
+                    |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
+                    |> liftCmd updateData
+
+            else if count == 2.0 then
+                ( Model model
+                    |> expandWordSelection i
+                , Cmd.none
+                )
+                    |> liftCmd updateData
+
+            else if count == 3.0 then
+                ( Model model
+                    |> expandLineSelection i
+                , Cmd.none
+                )
+                    |> liftCmd updateData
+
+            else
+                ( Model model
+                , Cmd.none
+                )
+
         MouseOverLine n ->
             ( Model model
             , Cmd.none
@@ -443,7 +474,18 @@ update updateData msg (Model model) =
                     )
                 |> liftCmd updateData
 
-        BackgroundClicked ->
+        MouseDownLine lineIndex ->
+            -- place caret at the end of the line
+            lineSize lineIndex model.text
+                |> Maybe.map
+                    (\s ->
+                        setCaretPos (s - 1) (Model model)
+                    )
+                |> Maybe.withDefault
+                    ( Model model, Cmd.none )
+                |> liftCmd updateData
+
+        BackgroundMouseDown ->
             -- place caret at the end of the text
             setCaretPos
                 (String.length model.text)
@@ -464,16 +506,23 @@ update updateData msg (Model model) =
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
                 |> liftCmd updateData
 
-        MouseDownLine lineIndex ->
-            -- place caret at the end of the line
-            lineSize lineIndex model.text
-                |> Maybe.map
-                    (\s ->
-                        setCaretPos (s - 1) (Model model)
-                    )
-                |> Maybe.withDefault
-                    ( Model model, Cmd.none )
+        BackgroundMouseLeft ->
+            ( Model model |> setSelectingAt Nothing
+            , Cmd.none
+            )
                 |> liftCmd updateData
+
+        BackgroundMouseEnter buttons ->
+            if 1 == buttons then
+                ( Model model |> setSelectingAt (Just 0)
+                , Cmd.none
+                )
+                    |> liftCmd updateData
+
+            else
+                ( Model model
+                , Cmd.none
+                )
 
         Focused (Ok ()) ->
             ( Model
@@ -719,6 +768,29 @@ expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
+expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s -> Model s
+expanSelectionWith fun pos (Model d) =
+    let
+        selection =
+            fun pos d.text
+                |> Maybe.withDefault (Range.range pos pos)
+    in
+    Model
+        { d
+            | selection = Just selection
+        }
+
+
+expandWordSelection : Int -> Model s -> Model s
+expandWordSelection =
+    expanSelectionWith wordRangeAt
+
+
+expandLineSelection : Int -> Model s -> Model s
+expandLineSelection =
+    expanSelectionWith lineRangeAt
+
+
 onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
 onKey isDown keyCode start end d =
     let
@@ -864,6 +936,34 @@ mouseEvent name createMsg =
             (Json.at [ "target", "clientWidth" ] Json.int)
 
 
+mouseEnterEvent : (Int -> msg) -> Attribute msg
+mouseEnterEvent createMsg =
+    custom "mouseenter" <|
+        Json.map
+            (\buttons ->
+                { message = createMsg buttons
+                , preventDefault = True
+                , stopPropagation = True
+                }
+            )
+            (Json.at [ "buttons" ] Json.int)
+
+
+mouseClickEvent : (Int -> Float -> msg) -> Attribute msg
+mouseClickEvent createMsg =
+    custom "click" <|
+        Json.map3
+            (\offsetX w detail ->
+                { message = createMsg (adjustIndex offsetX w) detail
+                , preventDefault = True
+                , stopPropagation = True
+                }
+            )
+            (Json.at [ "offsetX" ] Json.float)
+            (Json.at [ "target", "clientWidth" ] Json.int)
+            (Json.at [ "detail" ] Json.float)
+
+
 
 -- place caret at index i or i+1, depending
 -- on the location of the click inside the
@@ -910,6 +1010,7 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
               , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
               , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
               , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
+              , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
               ]
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]

@@ -89,7 +89,7 @@ suite =
         , test "when clicking the bg then the caret should not be set" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl IT.BackgroundClicked
+                    |> updateNoHl IT.BackgroundMouseDown
                     |> Expect.all
                         [ getSelection >> Expect.equal Nothing
                         , getSelectingAt >> Expect.equal (Just 11)

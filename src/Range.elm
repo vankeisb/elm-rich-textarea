@@ -39,9 +39,17 @@ contains index (Range from to) =
     (index >= from) && (index < to)
 
 
+
+-- TODO remplace getters by map
+
+
 getBounds : Range -> ( Int, Int )
 getBounds (Range from to) =
     ( from, to )
+
+
+
+-- TODO remplace getters by map
 
 
 getFrom : Range -> Int
