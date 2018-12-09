@@ -79,7 +79,7 @@ suite =
         , test "do not place caret on mouse down (line)" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl (IT.MouseDownLine 1)
+                    |> update (IT.MouseDownLine 1)
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
@@ -89,7 +89,7 @@ suite =
         , test "when clicking the bg then the caret should not be set" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl IT.BackgroundMouseDown
+                    |> update IT.BackgroundMouseDown
                     |> Expect.all
                         [ getSelection >> Expect.equal Nothing
                         , getSelectingAt >> Expect.equal (Just 11)
@@ -99,14 +99,14 @@ suite =
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
                     |> whileSelectingAt 11
-                    |> updateNoHl IT.BackgroundMouseUp
+                    |> update IT.BackgroundMouseUp
                     |> renderHtml
                     |> has [ hasCaretAt 11 ]
         , test "when mouse down on the line then the caret should be at the end of this line" <|
             \_ ->
                 createModelNoHl "foo\nbar\nbaz"
                     |> whileSelectingAt 3
-                    |> updateNoHl (IT.MouseUpLine 0)
+                    |> update (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , test "when clicking (mouse up and down) on the line then the caret should be at the end of this line" <|
@@ -114,7 +114,7 @@ suite =
                 createModelNoHl "foo\nbar\nbaz"
                     |> withSelection (range 3 3)
                     |> whileSelectingAt 3
-                    |> updateNoHl (IT.MouseUpLine 0)
+                    |> update (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , describe "mouse selection"
@@ -123,27 +123,17 @@ suite =
                     createModelNoHl "gnu\nbar\nbaz"
                         |> withSelection (range 1 2)
                         |> whileSelectingAt 1
-                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> update (IT.MouseOverLine 0)
                         |> renderHtml
                         |> expectSelectedText "nu"
             ]
         ]
 
 
-myUpdateData : Textarea.UpdateData Msg MyStyle
-myUpdateData =
-    { onHighlight = asyncEmptyHighlighter
-    }
-
-
-update : Textarea.UpdateData Msg MyStyle -> IT.Msg MyStyle -> Model Msg MyStyle -> Model Msg MyStyle
-update updateData msg model =
-    Textarea.update updateData msg model
+update : IT.Msg MyStyle -> Model Msg MyStyle -> Model Msg MyStyle
+update msg model =
+    Textarea.update msg model
         |> Tuple.first
-
-
-updateNoHl =
-    update myUpdateData
 
 
 emptyHighlighter =
@@ -183,6 +173,7 @@ createModel hl str =
         , initialText = str
         , lift = TextareaMsg
         , resolveStyles = resolveStyles
+        , onHighlight = asyncEmptyHighlighter
         }
         |> Tuple.first
 
@@ -257,7 +248,7 @@ updateSuite =
                     createModelNoHl "foo\nbar\nbaz"
                         |> withSelection (range 3 3)
                         |> whileSelectingAt 3
-                        |> updateNoHl (IT.MouseUpLine 0)
+                        |> update (IT.MouseUpLine 0)
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
             , test "expand at end of line" <|
@@ -265,7 +256,7 @@ updateSuite =
                     createModelNoHl "foo\nbar\nbaz"
                         |> withSelection (range 3 3)
                         |> whileSelectingAt 3
-                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> update (IT.MouseOverLine 0)
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
             ]

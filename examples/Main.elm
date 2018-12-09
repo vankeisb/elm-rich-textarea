@@ -41,6 +41,7 @@ init idPrefix =
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 , lift = TextareaMsg
                 , resolveStyles = resolveStyles
+                , onHighlight = onHighlight
                 }
     in
     ( { textareaModel = m
@@ -131,12 +132,8 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                updateData =
-                    { onHighlight = onHighlight
-                    }
-
                 ( tm, c ) =
-                    Textarea.update updateData sub model.textareaModel
+                    Textarea.update sub model.textareaModel
             in
             ( { model
                 | textareaModel =

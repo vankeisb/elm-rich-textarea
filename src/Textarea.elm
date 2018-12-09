@@ -4,7 +4,6 @@ module Textarea exposing
     , Model
     , Msg
     , ReturnStyles
-    , UpdateData
     , attributedRenderer
     , init
     , subscriptions
@@ -38,12 +37,17 @@ type alias Msg s =
     Internal.Textarea.Msg s
 
 
+type alias ReturnStyles msg s =
+    Internal.Textarea.ReturnStyles msg s
+
+
 type alias InitData msg s =
     { highlighter : Highlighter s
     , initialText : String
     , idPrefix : String
     , lift : Msg s -> msg
     , resolveStyles : StyleResolver msg s
+    , onHighlight : ReturnStyles msg s -> String -> Cmd msg
     }
 
 
@@ -70,6 +74,7 @@ init initData =
             , debounce = Debounce.init
             , lift = initData.lift
             , resolveStyles = initData.resolveStyles
+            , onHighlight = initData.onHighlight
             }
     in
     ( Model initialModelData
@@ -367,17 +372,8 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-type alias UpdateData msg s =
-    { onHighlight : ReturnStyles msg s -> String -> Cmd msg
-    }
-
-
-type alias ReturnStyles msg s =
-    List ( Range, s ) -> Cmd msg
-
-
-update : UpdateData msg s -> Msg s -> Model msg s -> ( Model msg s, Cmd msg )
-update updateData msg (Model model) =
+update : Msg s -> Model msg s -> ( Model msg s, Cmd msg )
+update msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
@@ -718,7 +714,7 @@ update updateData msg (Model model) =
                             |> Task.perform (NewHighlight model1.highlightId)
                             |> Cmd.map model1.lift
             in
-            ( Model model1, updateData.onHighlight return text )
+            ( Model model1, model1.onHighlight return text )
 
         NewHighlight highlightId styles ->
             if model.highlightId == highlightId then

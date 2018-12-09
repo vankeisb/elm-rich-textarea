@@ -3,6 +3,7 @@ module Internal.Textarea exposing
     , Model(..)
     , ModelData
     , Msg(..)
+    , ReturnStyles
     , StyleResolver
     , lineSize
     )
@@ -56,6 +57,7 @@ type alias ModelData msg s =
     , debounce : Debounce.Debounce String
     , lift : Msg s -> msg
     , resolveStyles : StyleResolver msg s
+    , onHighlight : ReturnStyles msg s -> String -> Cmd msg
     }
 
 
@@ -71,6 +73,10 @@ type alias Box =
 
 type alias StyleResolver msg s =
     List s -> List (Html.Attribute msg)
+
+
+type alias ReturnStyles msg s =
+    List ( Range, s ) -> Cmd msg
 
 
 type Model msg s
