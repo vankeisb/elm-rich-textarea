@@ -43,6 +43,7 @@ type alias InitData msg s =
     , initialText : String
     , idPrefix : String
     , lift : Msg s -> msg
+    , resolveStyles : StyleResolver msg s
     }
 
 
@@ -68,6 +69,7 @@ init initData =
             , highlightId = 0
             , debounce = Debounce.init
             , lift = initData.lift
+            , resolveStyles = initData.resolveStyles
             }
     in
     ( Model initialModelData
@@ -118,9 +120,12 @@ devMode =
     False
 
 
-view : Renderer s msg -> Model msg s -> Html msg
-view renderer (Model d) =
+view : Model msg s -> Html msg
+view (Model d) =
     let
+        renderer =
+            attributedRenderer (Model d)
+
         lines =
             d.styledTexts
                 |> List.indexedMap
@@ -976,14 +981,14 @@ adjustIndex offsetX clientWidth =
         0
 
 
-attributedRenderer : Model msg s -> (List s -> List (Html.Attribute msg)) -> Renderer s msg
-attributedRenderer (Model m) attrsSupplier isPrefix str from selRange styles =
+attributedRenderer : Model msg s -> Renderer s msg
+attributedRenderer (Model m) isPrefix str from selRange styles =
     let
         dataFrom f =
             attribute "data-from" <| String.fromInt f
 
         attrs =
-            attrsSupplier styles
+            m.resolveStyles styles
 
         charAttrs i =
             let

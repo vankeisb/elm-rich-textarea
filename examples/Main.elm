@@ -1,4 +1,4 @@
-port module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, renderer, subscriptions, update, view)
+port module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, resolveStyles, subscriptions, update, view)
 
 import Browser
 import Html exposing (..)
@@ -40,6 +40,7 @@ init idPrefix =
                 , highlighter = highlighter
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 , lift = TextareaMsg
+                , resolveStyles = resolveStyles
                 }
     in
     ( { textareaModel = m
@@ -62,15 +63,13 @@ view model =
             , style "position" "relative"
             , style "border" "1px solid lightgray"
             ]
-            [ Textarea.view
-                (Textarea.attributedRenderer model.textareaModel renderer)
-                model.textareaModel
+            [ Textarea.view model.textareaModel
             ]
         ]
 
 
-renderer : List MyStyle -> List (Html.Attribute Msg)
-renderer myStyles =
+resolveStyles : List MyStyle -> List (Html.Attribute Msg)
+resolveStyles myStyles =
     myStyles
         |> List.foldl
             (\myStyle attrs ->

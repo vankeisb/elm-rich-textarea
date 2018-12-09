@@ -156,8 +156,8 @@ asyncEmptyHighlighter =
     \return _ -> return []
 
 
-renderer : List MyStyle -> List (Html.Attribute Msg)
-renderer myStyles =
+resolveStyles : List MyStyle -> List (Html.Attribute Msg)
+resolveStyles myStyles =
     myStyles
         |> List.foldl
             (\myStyle attrs ->
@@ -182,6 +182,7 @@ createModel hl str =
         , highlighter = hl
         , initialText = str
         , lift = TextareaMsg
+        , resolveStyles = resolveStyles
         }
         |> Tuple.first
 
@@ -208,9 +209,7 @@ whileSelectingAt at (IT.Model d) =
 
 renderHtml : Model Msg MyStyle -> Single Msg
 renderHtml m =
-    Textarea.view
-        (Textarea.attributedRenderer m renderer)
-        m
+    Textarea.view m
         |> fromHtml
 
 

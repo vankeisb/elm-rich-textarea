@@ -3,12 +3,14 @@ module Internal.Textarea exposing
     , Model(..)
     , ModelData
     , Msg(..)
+    , StyleResolver
     , lineSize
     )
 
 import Array
 import Browser.Dom as Dom
 import Debounce
+import Html
 import Range exposing (Range)
 import Styles exposing (StyledText, Styles)
 
@@ -53,6 +55,7 @@ type alias ModelData msg s =
     , highlightId : Int
     , debounce : Debounce.Debounce String
     , lift : Msg s -> msg
+    , resolveStyles : StyleResolver msg s
     }
 
 
@@ -64,6 +67,10 @@ type alias Box =
     , scrollTop : Float
     , scrollLeft : Float
     }
+
+
+type alias StyleResolver msg s =
+    List s -> List (Html.Attribute msg)
 
 
 type Model msg s
