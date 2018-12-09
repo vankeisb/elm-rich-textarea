@@ -132,12 +132,11 @@ suite =
 
 myUpdateData : Textarea.UpdateData Msg MyStyle
 myUpdateData =
-    { lift = TextareaMsg
-    , onHighlight = asyncEmptyHighlighter
+    { onHighlight = asyncEmptyHighlighter
     }
 
 
-update : Textarea.UpdateData Msg MyStyle -> IT.Msg MyStyle -> Model MyStyle -> Model MyStyle
+update : Textarea.UpdateData Msg MyStyle -> IT.Msg MyStyle -> Model Msg MyStyle -> Model Msg MyStyle
 update updateData msg model =
     Textarea.update updateData msg model
         |> Tuple.first
@@ -176,12 +175,13 @@ renderer myStyles =
             []
 
 
-createModel : Highlighter MyStyle -> String -> Model MyStyle
+createModel : Highlighter MyStyle -> String -> Model Msg MyStyle
 createModel hl str =
     Textarea.init
         { idPrefix = "test-ta"
         , highlighter = hl
         , initialText = str
+        , lift = TextareaMsg
         }
         |> Tuple.first
 
@@ -190,7 +190,7 @@ createModelNoHl =
     createModel emptyHighlighter
 
 
-withSelection : Range -> Model s -> Model s
+withSelection : Range -> Model msg s -> Model msg s
 withSelection range (IT.Model d) =
     IT.Model
         { d
@@ -198,7 +198,7 @@ withSelection range (IT.Model d) =
         }
 
 
-whileSelectingAt : Int -> Model s -> Model s
+whileSelectingAt : Int -> Model msg s -> Model msg s
 whileSelectingAt at (IT.Model d) =
     IT.Model
         { d
@@ -206,11 +206,10 @@ whileSelectingAt at (IT.Model d) =
         }
 
 
-renderHtml : Model MyStyle -> Single Msg
+renderHtml : Model Msg MyStyle -> Single Msg
 renderHtml m =
     Textarea.view
-        TextareaMsg
-        (Textarea.attributedRenderer m TextareaMsg renderer)
+        (Textarea.attributedRenderer m renderer)
         m
         |> fromHtml
 
@@ -274,11 +273,11 @@ updateSuite =
         ]
 
 
-getSelection : Model s -> Maybe Range
+getSelection : Model msg s -> Maybe Range
 getSelection (IT.Model d) =
     .selection d
 
 
-getSelectingAt : Model s -> Maybe Int
+getSelectingAt : Model msg s -> Maybe Int
 getSelectingAt (IT.Model d) =
     .selectingAt d

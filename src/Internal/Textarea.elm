@@ -41,7 +41,7 @@ type Msg s
     | DebounceMsg Debounce.Msg
 
 
-type alias ModelData s =
+type alias ModelData msg s =
     { idPrefix : String
     , text : String
     , selection : Maybe Range
@@ -52,6 +52,7 @@ type alias ModelData s =
     , selectingAt : Maybe Int
     , highlightId : Int
     , debounce : Debounce.Debounce String
+    , lift : Msg s -> msg
     }
 
 
@@ -65,8 +66,8 @@ type alias Box =
     }
 
 
-type Model s
-    = Model (ModelData s)
+type Model msg s
+    = Model (ModelData msg s)
 
 
 lineSize : Int -> String -> Maybe Int

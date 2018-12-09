@@ -21,7 +21,7 @@ type MyStyle
 
 
 type alias Model =
-    { textareaModel : Textarea.Model MyStyle
+    { textareaModel : Textarea.Model Msg MyStyle
     }
 
 
@@ -33,6 +33,7 @@ init idPrefix =
                 { idPrefix = "my-ta"
                 , highlighter = highlighter
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                , lift = TextareaMsg
                 }
     in
     ( { textareaModel = m
@@ -55,8 +56,7 @@ view model =
             , style "border" "1px solid lightgray"
             ]
             [ Textarea.view
-                TextareaMsg
-                (Textarea.attributedRenderer model.textareaModel TextareaMsg renderer)
+                (Textarea.attributedRenderer model.textareaModel renderer)
                 model.textareaModel
             ]
         ]
@@ -126,8 +126,7 @@ update msg model =
         TextareaMsg sub ->
             let
                 updateData =
-                    { lift = TextareaMsg
-                    , onHighlight = onHighlight
+                    { onHighlight = onHighlight
                     }
 
                 ( tm, c ) =
