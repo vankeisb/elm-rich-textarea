@@ -1,25 +1,36 @@
-module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, renderer, subscriptions, update, view)
+module WithElmParser exposing (..)
 
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Json.Decode as D
+import Json.Encode as E
+import Platform.Cmd exposing (Cmd)
 import Range exposing (Range)
-import Styles
 import Task
 import Textarea
 
+{-
+    Using the textarea in pure Elm.
+-}
 
 type Msg
-    = TextareaMsg (Textarea.Msg MyStyle)
+    = TextareaMsg Textarea.Msg
     | TextClicked
 
 
+{-
+    Custom user styles
+-}
 type MyStyle
     = Keyword
     | Identifier
 
 
+{-
+    Your Model should keep the textarea's Model, that's parent/child...
+-}
 type alias Model =
     { textareaModel : Textarea.Model MyStyle
     }
@@ -28,12 +39,15 @@ type alias Model =
 init : String -> ( Model, Cmd Msg )
 init idPrefix =
     let
+        initialText =
+            "let\n  foo = 1\nin\n  foo + bar"
+
+
+        -- init the textarea : we pass the text and
+        -- the styles for this text
         ( m, c ) =
             Textarea.init
-                { idPrefix = "my-ta"
-                , highlighter = highlighter
-                , initialText = "let\n  foo = 1\nin\n  foo + bar"
-                }
+                (Textarea.defaultInitData idPrefix initialText)
     in
     ( { textareaModel = m
       }
@@ -44,21 +58,15 @@ init idPrefix =
 view : Model -> Html Msg
 view model =
     div
-        []
-        [ h1
-            []
-            [ text "This is a textarea... with style ! " ]
-        , div
-            [ style "width" "400px"
-            , style "height" "200px"
-            , style "position" "relative"
-            , style "border" "1px solid lightgray"
-            ]
-            [ Textarea.view
-                TextareaMsg
-                (Textarea.attributedRenderer model.textareaModel TextareaMsg renderer)
-                model.textareaModel
-            ]
+        [ style "width" "400px"
+        , style "height" "200px"
+        , style "position" "relative"
+        , style "border" "1px solid lightgray"
+        ]
+        [ Textarea.view
+            TextareaMsg
+            renderer
+            model.textareaModel
         ]
 
 
@@ -83,8 +91,8 @@ renderer myStyles =
             []
 
 
-highlighter : String -> List ( Range, MyStyle )
-highlighter text =
+highlight : String -> List ( Range, MyStyle )
+highlight text =
     let
         stylify style word =
             String.indexes word text
@@ -125,19 +133,25 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                updateData =
-                    { lift = TextareaMsg
-                    , onHighlight = onHighlight
-                    }
+                ( tm, c, o ) =
+                    Textarea.update sub model.textareaModel
 
-                ( tm, c ) =
-                    Textarea.update updateData sub model.textareaModel
+                tm2 =
+                    case o of
+                        Just (Textarea.RequestHighlight hr) ->
+                            Textarea.applyStyles
+                                hr.id
+                                (highlight hr.text)
+                                tm
+
+                        Nothing ->
+                            tm
             in
             ( { model
                 | textareaModel =
-                    tm
+                    tm2
               }
-            , c
+            , Cmd.map TextareaMsg c
             )
 
         TextClicked ->
@@ -146,21 +160,6 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.map TextareaMsg <|
-        Textarea.subscriptions model.textareaModel
-
-
-main =
-    Browser.element
-        { init =
-            \() ->
-                init "my-textarea"
-        , update = update
-        , subscriptions = subscriptions
-        , view = view
-        }
-
-
-onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
-onHighlight return text =
-    return (highlighter text)
+    Sub.batch
+        [ Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
+        ]

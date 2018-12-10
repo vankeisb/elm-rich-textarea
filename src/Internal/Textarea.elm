@@ -1,19 +1,25 @@
 module Internal.Textarea exposing
     ( Box
+    , HighlightId
     , Model(..)
     , ModelData
     , Msg(..)
+    , encodeHighlightId
+    , highlightIdDecoder
+    , initialHighlightId
     , lineSize
     )
 
 import Array
 import Browser.Dom as Dom
 import Debounce
+import Internal.Styles exposing (StyledText, Styles)
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Range exposing (Range)
-import Styles exposing (StyledText, Styles)
 
 
-type Msg s
+type Msg
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
@@ -23,19 +29,30 @@ type Msg s
     | MouseDownLine Int
     | MouseOverLine Int
     | MouseUpLine Int
-    | BackgroundClicked
+    | MouseClicks Int Float
+    | BackgroundMouseDown
     | BackgroundMouseOver
     | BackgroundMouseUp
+    | BackgroundMouseLeft
+    | BackgroundMouseEnter Int
     | Focused (Result Dom.Error ())
     | Blurred
     | GetViewportPos (Result Dom.Error Dom.Element)
     | GetViewport (Result Dom.Error Dom.Viewport)
     | GetCharViewport (Result Dom.Error Dom.Element)
     | Scrolled Float Float
-    | NoOp
-    | RequestHighlight String
-    | NewHighlight Int (List ( Range, s ))
     | DebounceMsg Debounce.Msg
+    | TriggerHighlight
+    | NoOp
+
+
+type HighlightId
+    = HighlightId Int
+
+
+initialHighlightId : HighlightId
+initialHighlightId =
+    HighlightId 0
 
 
 type alias ModelData s =
@@ -47,8 +64,9 @@ type alias ModelData s =
     , focused : Bool
     , viewportBox : Box
     , selectingAt : Maybe Int
-    , highlightId : Int
-    , debounce : Debounce.Debounce String
+    , highlightId : HighlightId
+    , debounce : Debounce.Debounce HighlightId
+    , debounceMs : Float
     }
 
 
@@ -82,3 +100,13 @@ lineSize n text =
         |> Tuple.second
         |> Array.fromList
         |> Array.get n
+
+
+encodeHighlightId : HighlightId -> Encode.Value
+encodeHighlightId (HighlightId id) =
+    Encode.int id
+
+
+highlightIdDecoder : Decode.Decoder HighlightId
+highlightIdDecoder =
+    Decode.map HighlightId Decode.int
