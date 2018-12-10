@@ -97,9 +97,6 @@ renderer myStyles =
 highlight : String -> List ( Range, MyStyle )
 highlight text =
     let
-        x =
-            Debug.log "hlText" text
-
         stylify style word =
             String.indexes word text
                 |> List.map

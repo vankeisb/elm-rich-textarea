@@ -349,7 +349,6 @@ computeStyledTexts (Model d) =
                         )
                         ( 0, [] )
                     |> Tuple.second
-                    |> Debug.log "styledTexts"
         }
 
 
@@ -1058,7 +1057,7 @@ applyStyles highlightId styles (Model model) =
             { model
                 | styles =
                     S.empty
-                        |> S.addStyles (Debug.log "styles" styles)
+                        |> S.addStyles styles
             }
             |> computeStyledTexts
     else
