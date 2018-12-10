@@ -11,33 +11,44 @@ import Range exposing (Range)
 import Task
 import Textarea
 
+{-
+    Example of using the textarea with an Elm-based "parser".
+-}
 
 type Msg
     = TextareaMsg Textarea.Msg
     | TextClicked
 
 
+{-
+    Custom user styles
+-}
 type MyStyle
     = Keyword
     | Identifier
 
 
+{-
+    Your Model should keep the textarea's Model, that's parent/child...
+-}
 type alias Model =
     { textareaModel : Textarea.Model MyStyle
     }
 
 
-init : String -> ( Model, Cmd Msg )
-init idPrefix =
+init : ( Model, Cmd Msg )
+init =
     let
         initialText =
             "let\n  foo = 1\nin\n  foo + bar"
 
+
+        -- init the textarea : we pass the text and
+        -- the styles for this text
         ( m, c ) =
             Textarea.init
                 { idPrefix = "my-ta"
                 , initialText = initialText
-                , initialStyles = highlight initialText
                 , debounceMs = 1000
                 }
     in
@@ -170,7 +181,7 @@ main =
     Browser.element
         { init =
             \() ->
-                init "my-textarea"
+                init
         , update = update
         , subscriptions = subscriptions
         , view = view

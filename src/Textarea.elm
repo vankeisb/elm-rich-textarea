@@ -53,10 +53,9 @@ type OutMsg
     = RequestHighlight HighlightRequest
 
 
-type alias InitData s =
+type alias InitData =
     { initialText : String
     , idPrefix : String
-    , initialStyles: List (Range, s)
     , debounceMs: Float
     }
 
@@ -69,7 +68,7 @@ debounceConfig ms =
     }
 
 
-init : InitData s -> ( Model s, Cmd Msg )
+init : InitData -> ( Model s, Cmd Msg )
 init initData =
     let
         initialModelData =
@@ -94,9 +93,9 @@ init initData =
             }
     in
     ( Model initialModelData
-        |> applyStyles initialHighlightId initData.initialStyles
+        |> applyStyles initialHighlightId []
         |> computeStyledTexts
-    , Cmd.none
+    , triggerHighlightNow
     )
         |> getViewportPos
 
@@ -717,10 +716,7 @@ update msg (Model model) =
                     Debounce.update
                         (debounceConfig model.debounceMs)
                         (Debounce.takeLast
-                            (\_ ->
-                                Task.succeed ()
-                                    |> Task.perform (\_ -> TriggerHighlight)
-                            )
+                            (\_ -> triggerHighlightNow )
                         )
                         m
                         model.debounce
@@ -745,6 +741,12 @@ update msg (Model model) =
                                 , text = model.text
                                 }
                         )
+
+
+triggerHighlightNow: Cmd Msg
+triggerHighlightNow =
+    Task.succeed ()
+        |> Task.perform (\_ -> TriggerHighlight)
 
 
 setCaretPos : Int -> Model s -> ( Model s, Cmd Msg)

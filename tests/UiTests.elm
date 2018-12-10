@@ -172,7 +172,6 @@ createModel str =
     Textarea.init
         { idPrefix = "test-ta"
         , initialText = str
-        , initialStyles = []
         , debounceMs = 1000
         }
         |> Tuple.first
