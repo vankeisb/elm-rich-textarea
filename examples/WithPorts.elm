@@ -66,7 +66,7 @@ view model =
         ]
         [ Textarea.view
             TextareaMsg
-            (Textarea.attributedRenderer model.textareaModel TextareaMsg renderer)
+            renderer
             model.textareaModel
         ]
 

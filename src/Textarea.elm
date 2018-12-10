@@ -2,7 +2,6 @@ module Textarea exposing
     ( InitData
     , Model
     , Msg
-    , attributedRenderer
     , init
     , subscriptions
     , update
@@ -34,7 +33,7 @@ import Json.Decode as Json
 import Json.Encode as Encode
 import Process
 import Range exposing (Range)
-import Internal.Styles as S exposing (Styles)
+import Internal.Styles as S exposing (Styles, StyledText)
 import Task
 import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
@@ -173,17 +172,8 @@ charId d i =
     d.idPrefix ++ "-char-" ++ String.fromInt i
 
 
-
-{-
-   Applies styles to a string at a given offset. Selection
-   range is also passed for drawing the selection.
--}
--- TODO simplify
-
-
-type alias Renderer s m =
-    String -> String -> Int -> Maybe Range -> List s -> Html m
-
+{-| Get Attributes to be applied for a list of Styles -}
+type alias Highlighter s m = List s -> List (Html.Attribute m)
 
 
 -- used to display the textarea
@@ -195,8 +185,8 @@ devMode =
 
 {-| Render the rich textarea widget.
 -}
-view : (Msg -> m) -> Renderer s m -> Model s -> Html m
-view lift renderer (Model d) =
+view : (Msg -> m) -> Highlighter s m -> Model s -> Html m
+view lift highlighter (Model d) =
     let
         lines =
             d.styledTexts
@@ -210,14 +200,7 @@ view lift renderer (Model d) =
                             ]
                             (lineElems
                                 |> List.map
-                                    (\e ->
-                                        renderer
-                                            d.idPrefix
-                                            e.text
-                                            (Range.getFrom e.range)
-                                            d.selection
-                                            e.styles
-                                    )
+                                    ( renderStyledText d lift highlighter )
                             )
                     )
 
@@ -344,6 +327,87 @@ view lift renderer (Model d) =
                 []
         ]
 
+
+
+renderStyledText: ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
+renderStyledText m lift highlighter st =
+    let
+        dataFrom f =
+            attribute "data-from" <| String.fromInt f
+
+        attrs =
+            highlighter st.styles
+
+        selRange =
+            m.selection
+
+        from =
+            Range.getFrom st.range
+
+        charAttrs i =
+            let
+                ( isSelected, isCaretLeft ) =
+                    selRange
+                        |> Maybe.map
+                            (\r ->
+                                ( Range.contains (from + i) r
+                                , Range.isCaret (from + i) r
+                                )
+                            )
+                        |> Maybe.withDefault
+                            ( False
+                            , False
+                            )
+            in
+            ( [ dataFrom <| from + i
+              , style "display" "inline-block"
+              , style "position" "relative"
+              , id <| charId m (from + i)
+              , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
+              , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
+              , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
+              , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
+              ]
+                ++ (if isSelected then
+                        [ style "background-color" "lightblue" ]
+
+                    else
+                        []
+                   )
+            , isCaretLeft
+            )
+    in
+    span
+        attrs
+        ( st.text
+            |> String.toList
+            |> List.indexedMap
+                (\i c ->
+                    let
+                        ( ca, isCaretLeft ) =
+                            charAttrs i
+                    in
+                    div
+                        ca
+                        [ if isCaretLeft then
+                            div
+                                [ style "border-left" "1px solid black"
+                                , style "position" "absolute"
+                                , style "top" "0"
+                                , style "left" "0"
+                                , style "bottom" "0"
+                                , style "width" "0px"
+                                , style "box-sizing" "border-box"
+                                , class "blinking-cursor"
+                                ]
+                                []
+
+                          else
+                            text ""
+                        , text (String.fromChar c)
+                        ]
+                )
+        )
 
 
 computeStyledTexts : Model s -> Model s
@@ -993,81 +1057,6 @@ adjustIndex offsetX clientWidth =
 
     else
         0
-
-
-attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
-attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange styles =
-    let
-        dataFrom f =
-            attribute "data-from" <| String.fromInt f
-
-        attrs =
-            attrsSupplier styles
-
-        charAttrs i =
-            let
-                ( isSelected, isCaretLeft ) =
-                    selRange
-                        |> Maybe.map
-                            (\r ->
-                                ( Range.contains (from + i) r
-                                , Range.isCaret (from + i) r
-                                )
-                            )
-                        |> Maybe.withDefault
-                            ( False
-                            , False
-                            )
-            in
-            ( [ dataFrom <| from + i
-              , style "display" "inline-block"
-              , style "position" "relative"
-              , id <| charId m (from + i)
-              , mouseEvent "mousedown" (\adjust -> lift <| MouseDown <| from + i + adjust)
-              , mouseEvent "mouseover" (\adjust -> lift <| MouseOver <| from + i + adjust)
-              , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
-              , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
-              ]
-                ++ (if isSelected then
-                        [ style "background-color" "lightblue" ]
-
-                    else
-                        []
-                   )
-            , isCaretLeft
-            )
-    in
-    span
-        attrs
-        (str
-            |> String.toList
-            |> List.indexedMap
-                (\i c ->
-                    let
-                        ( ca, isCaretLeft ) =
-                            charAttrs i
-                    in
-                    div
-                        ca
-                        [ if isCaretLeft then
-                            div
-                                [ style "border-left" "1px solid black"
-                                , style "position" "absolute"
-                                , style "top" "0"
-                                , style "left" "0"
-                                , style "bottom" "0"
-                                , style "width" "0px"
-                                , style "box-sizing" "border-box"
-                                , class "blinking-cursor"
-                                ]
-                                []
-
-                          else
-                            text ""
-                        , text (String.fromChar c)
-                        ]
-                )
-        )
 
 
 applyStyles: HighlightId -> List (Range, s) -> Model s -> Model s

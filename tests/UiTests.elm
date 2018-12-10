@@ -198,7 +198,7 @@ renderHtml : Model MyStyle -> Single Msg
 renderHtml m =
     Textarea.view
         TextareaMsg
-        (Textarea.attributedRenderer m TextareaMsg renderer)
+        renderer
         m
         |> fromHtml
 
