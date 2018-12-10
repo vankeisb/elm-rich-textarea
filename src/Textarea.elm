@@ -607,8 +607,8 @@ update msg (Model model) =
 
                 Err _ ->
                     Model model
-            , Cmd.none
             )
+                |> noCmd
                 |> noOut
 
         GetCharViewport element ->
@@ -709,18 +709,18 @@ update msg (Model model) =
                         , scrollLeft = x
                     }
             in
-            ( Model
+            Model
                 { model
                     | viewportBox =
                         newBox
                 }
-            , Cmd.none
-            )
+                |> noCmd
                 |> noOut
 
 
         NoOp ->
-            ( Model model, Cmd.none )
+            Model model
+                |> noCmd
                 |> noOut
 
         DebounceMsg m ->
