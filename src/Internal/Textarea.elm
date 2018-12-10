@@ -1,22 +1,22 @@
 module Internal.Textarea exposing
     ( Box
+    , HighlightId
     , Model(..)
     , ModelData
     , Msg(..)
-    , lineSize
-    , HighlightId
-    , initialHighlightId
     , encodeHighlightId
     , highlightIdDecoder
+    , initialHighlightId
+    , lineSize
     )
 
 import Array
 import Browser.Dom as Dom
 import Debounce
-import Range exposing (Range)
 import Internal.Styles exposing (StyledText, Styles)
-import Json.Encode as Encode
 import Json.Decode as Decode
+import Json.Encode as Encode
+import Range exposing (Range)
 
 
 type Msg
@@ -46,11 +46,11 @@ type Msg
     | NoOp
 
 
-type HighlightId =
-    HighlightId Int
+type HighlightId
+    = HighlightId Int
 
 
-initialHighlightId: HighlightId
+initialHighlightId : HighlightId
 initialHighlightId =
     HighlightId 0
 
@@ -66,7 +66,7 @@ type alias ModelData s =
     , selectingAt : Maybe Int
     , highlightId : HighlightId
     , debounce : Debounce.Debounce HighlightId
-    , debounceMs: Float
+    , debounceMs : Float
     }
 
 
@@ -102,11 +102,11 @@ lineSize n text =
         |> Array.get n
 
 
-encodeHighlightId: HighlightId -> Encode.Value
+encodeHighlightId : HighlightId -> Encode.Value
 encodeHighlightId (HighlightId id) =
     Encode.int id
 
 
-highlightIdDecoder: Decode.Decoder HighlightId
+highlightIdDecoder : Decode.Decoder HighlightId
 highlightIdDecoder =
     Decode.map HighlightId Decode.int

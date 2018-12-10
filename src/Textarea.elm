@@ -1,25 +1,23 @@
 module Textarea exposing
-    ( InitData
+    ( HighlightId
+    , HighlightRequest
+    , HighlightResponse
+    , InitData
     , Model
     , Msg
+    , OutMsg(..)
+    , applyStyles
+    , defaultInitData
+    , encodeHighlightRequest
+    , highlightResponseDecoder
     , init
     , subscriptions
     , update
     , view
-    , HighlightId
-    , OutMsg(..)
-    , HighlightRequest
-    , applyStyles
-    , encodeHighlightRequest
-    , HighlightResponse
-    , highlightResponseDecoder
-    , defaultInitData
     )
-
 
 {-| Rich textarea TEA component.
 -}
-
 
 import Array
 import Browser
@@ -28,48 +26,55 @@ import Debounce
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Internal.Styles as S exposing (StyledText, Styles)
 import Internal.Textarea exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Process
 import Range exposing (Range)
-import Internal.Styles as S exposing (Styles, StyledText)
 import Task
 import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
 
 
-{-| Model, should be stored in the parent's -}
+{-| Model, should be stored in the parent's
+-}
 type alias Model s =
     Internal.Textarea.Model s
 
 
-{-| Msgs should be relayed by the parent -}
+{-| Msgs should be relayed by the parent
+-}
 type alias Msg =
     Internal.Textarea.Msg
 
 
-{-| Opaque type for highlight ID. -}
+{-| Opaque type for highlight ID.
+-}
 type alias HighlightId =
     Internal.Textarea.HighlightId
 
-{-| Highlight request indicates that the editor need to highlight the text -}
+
+{-| Highlight request indicates that the editor need to highlight the text
+-}
 type alias HighlightRequest =
-    { id: HighlightId
-    , text: String
+    { id : HighlightId
+    , text : String
     }
 
 
-{-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly. -}
+{-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
+-}
 type OutMsg
     = RequestHighlight HighlightRequest
 
 
-{-| Init dat afor the textarea -}
+{-| Init dat afor the textarea
+-}
 type alias InitData =
     { initialText : String
     , idPrefix : String
-    , debounceMs: Float
+    , debounceMs : Float
     }
 
 
@@ -80,8 +85,9 @@ debounceConfig ms =
     }
 
 
-{-| Create a default init data with passed id prefix and initial text -}
-defaultInitData: String -> String -> InitData
+{-| Create a default init data with passed id prefix and initial text
+-}
+defaultInitData : String -> String -> InitData
 defaultInitData idPrefix initialText =
     { initialText = initialText
     , idPrefix = idPrefix
@@ -89,7 +95,8 @@ defaultInitData idPrefix initialText =
     }
 
 
-{-| initialize everything, and triggers the initial highlight request. -}
+{-| initialize everything, and triggers the initial highlight request.
+-}
 init : InitData -> ( Model s, Cmd Msg )
 init initData =
     let
@@ -122,10 +129,10 @@ init initData =
         |> getViewportPos
 
 
-requestHighlight: (Model m, Cmd Msg) -> (Model m, Cmd Msg, Maybe OutMsg)
-requestHighlight (Model model, cmd) =
+requestHighlight : ( Model m, Cmd Msg ) -> ( Model m, Cmd Msg, Maybe OutMsg )
+requestHighlight ( Model model, cmd ) =
     let
-        (debounce, debounceCmd) =
+        ( debounce, debounceCmd ) =
             Debounce.push (debounceConfig model.debounceMs) model.highlightId model.debounce
     in
     ( Model
@@ -140,15 +147,14 @@ requestHighlight (Model model, cmd) =
         |> noOut
 
 
-withOutMsg: Maybe OutMsg -> (Model s, Cmd Msg) -> (Model s, Cmd Msg, Maybe OutMsg)
-withOutMsg outMsg (model, cmd) =
-    (model, cmd, outMsg)
+withOutMsg : Maybe OutMsg -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+withOutMsg outMsg ( model, cmd ) =
+    ( model, cmd, outMsg )
 
 
-noOut: (Model s, Cmd Msg) -> (Model s, Cmd Msg, Maybe OutMsg)
+noOut : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
 noOut =
     withOutMsg Nothing
-
 
 
 focusTextarea : ModelData s -> Cmd Msg
@@ -172,8 +178,11 @@ charId d i =
     d.idPrefix ++ "-char-" ++ String.fromInt i
 
 
-{-| Get Attributes to be applied for a list of Styles -}
-type alias Highlighter s m = List s -> List (Html.Attribute m)
+{-| Get Attributes to be applied for a list of Styles
+-}
+type alias Highlighter s m =
+    List s -> List (Html.Attribute m)
+
 
 
 -- used to display the textarea
@@ -200,7 +209,7 @@ view lift highlighter (Model d) =
                             ]
                             (lineElems
                                 |> List.map
-                                    ( renderStyledText d lift highlighter )
+                                    (renderStyledText d lift highlighter)
                             )
                     )
 
@@ -328,8 +337,7 @@ view lift highlighter (Model d) =
         ]
 
 
-
-renderStyledText: ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
+renderStyledText : ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
 renderStyledText m lift highlighter st =
     let
         dataFrom f =
@@ -379,7 +387,7 @@ renderStyledText m lift highlighter st =
     in
     span
         attrs
-        ( st.text
+        (st.text
             |> String.toList
             |> List.indexedMap
                 (\i c ->
@@ -452,18 +460,15 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg) -> ( Model s, Cmd Msg )
+updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 updateIfSelecting fun ( Model model, c ) =
-    (
-        if model.selectingAt /= Nothing then
-            ( Model model, c )
-                |> Tuple.mapFirst fun
-                |> scrollCaretIntoView model.selection
+    if model.selectingAt /= Nothing then
+        ( Model model, c )
+            |> Tuple.mapFirst fun
+            |> scrollCaretIntoView model.selection
 
-        else
-            ( Model model, c )
-    )
-
+    else
+        ( Model model, c )
 
 
 update : Msg -> Model s -> ( Model s, Cmd Msg, Maybe OutMsg )
@@ -492,7 +497,6 @@ update msg (Model model) =
         OnKeyDown keyCode start end ->
             onKey True keyCode start end model
 
-
         OnKeyUp keyCode start end ->
             onKey False keyCode start end model
 
@@ -512,7 +516,6 @@ update msg (Model model) =
                 |> updateIfSelecting (expandSelection i)
                 |> noOut
 
-
         MouseClicks i count ->
             if count == 1.0 then
                 Model model
@@ -520,7 +523,6 @@ update msg (Model model) =
                     |> setCaretPos i
                     |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
                     |> noOut
-
 
             else if count == 2.0 then
                 Model model
@@ -550,7 +552,6 @@ update msg (Model model) =
                     )
                 |> noOut
 
-
         MouseUpLine n ->
             Model model
                 |> noCmd
@@ -562,7 +563,6 @@ update msg (Model model) =
                             |> Maybe.withDefault (Model m)
                     )
                 |> noOut
-
 
         MouseDownLine lineIndex ->
             -- place caret at the end of the line
@@ -582,7 +582,6 @@ update msg (Model model) =
                 (Model model)
                 |> noOut
 
-
         BackgroundMouseOver ->
             Model model
                 |> noCmd
@@ -594,7 +593,6 @@ update msg (Model model) =
                 |> noCmd
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
                 |> noOut
-
 
         BackgroundMouseLeft ->
             Model model
@@ -608,8 +606,9 @@ update msg (Model model) =
                     |> setSelectingAt (Just 0)
                     |> noCmd
                     |> noOut
+
             else
-               Model model
+                Model model
                     |> noCmd
                     |> noOut
 
@@ -626,7 +625,6 @@ update msg (Model model) =
                 |> noCmd
                 |> noOut
 
-
         Blurred ->
             Model
                 { model
@@ -636,7 +634,6 @@ update msg (Model model) =
                 |> noCmd
                 |> setSelection Nothing
                 |> noOut
-
 
         GetViewportPos element ->
             case element of
@@ -663,7 +660,7 @@ update msg (Model model) =
                         |> noOut
 
         GetViewport vp ->
-            ( case vp of
+            (case vp of
                 Ok v ->
                     let
                         box =
@@ -772,7 +769,6 @@ update msg (Model model) =
                     ( Model model, Cmd.none )
                         |> noOut
 
-
         Scrolled x y ->
             let
                 box =
@@ -792,7 +788,6 @@ update msg (Model model) =
                 |> noCmd
                 |> noOut
 
-
         NoOp ->
             Model model
                 |> noCmd
@@ -800,11 +795,11 @@ update msg (Model model) =
 
         DebounceMsg m ->
             let
-                (debounce, cmd) =
+                ( debounce, cmd ) =
                     Debounce.update
                         (debounceConfig model.debounceMs)
                         (Debounce.takeLast
-                            (\_ -> triggerHighlightNow )
+                            (\_ -> triggerHighlightNow)
                         )
                         m
                         model.debounce
@@ -818,26 +813,25 @@ update msg (Model model) =
             )
                 |> noOut
 
-
         TriggerHighlight ->
             Model model
                 |> noCmd
                 |> withOutMsg
-                        ( Just <|
-                            RequestHighlight
-                                { id = model.highlightId
-                                , text = model.text
-                                }
-                        )
+                    (Just <|
+                        RequestHighlight
+                            { id = model.highlightId
+                            , text = model.text
+                            }
+                    )
 
 
-triggerHighlightNow: Cmd Msg
+triggerHighlightNow : Cmd Msg
 triggerHighlightNow =
     Task.succeed ()
         |> Task.perform (\_ -> TriggerHighlight)
 
 
-setCaretPos : Int -> Model s -> ( Model s, Cmd Msg)
+setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
         |> setSelectingAt (Just i)
@@ -920,7 +914,7 @@ onKey isDown keyCode start end d =
         |> requestHighlight
 
 
-getViewportPos : ( Model s, Cmd Msg) -> ( Model s, Cmd Msg)
+getViewportPos : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -1059,7 +1053,7 @@ adjustIndex offsetX clientWidth =
         0
 
 
-applyStyles: HighlightId -> List (Range, s) -> Model s -> Model s
+applyStyles : HighlightId -> List ( Range, s ) -> Model s -> Model s
 applyStyles highlightId styles (Model model) =
     if model.highlightId == highlightId then
         Model
@@ -1069,42 +1063,42 @@ applyStyles highlightId styles (Model model) =
                         |> S.addStyles styles
             }
             |> computeStyledTexts
+
     else
         Model model
 
 
 
 {-
-    Support for ports : encoding and decoding of highlight requests and responses...
+   Support for ports : encoding and decoding of highlight requests and responses...
 -}
 
 
-encodeHighlightRequest: HighlightRequest -> Encode.Value
+encodeHighlightRequest : HighlightRequest -> Encode.Value
 encodeHighlightRequest r =
     Encode.object
-        [ ("id", encodeHighlightId r.id)
-        , ("text", Encode.string r.text)
+        [ ( "id", encodeHighlightId r.id )
+        , ( "text", Encode.string r.text )
         ]
 
 
 type alias HighlightResponse s =
-    { id: HighlightId
-    , styles : List (Range, s)
+    { id : HighlightId
+    , styles : List ( Range, s )
     }
 
 
 highlightResponseDecoder : Json.Decoder s -> Json.Decoder (HighlightResponse s)
 highlightResponseDecoder styleDecoder =
     let
-        rangeAndStyleDecoder: Json.Decoder (Range, s)
+        rangeAndStyleDecoder : Json.Decoder ( Range, s )
         rangeAndStyleDecoder =
             Json.map2
                 (\range styleValue ->
-                    (range, styleValue)
+                    ( range, styleValue )
                 )
                 (Json.field "range" rangeDecoder)
                 (Json.field "style" styleDecoder)
-
     in
     Json.map2 HighlightResponse
         (Json.field "id" highlightIdDecoder)
@@ -1113,9 +1107,8 @@ highlightResponseDecoder styleDecoder =
         )
 
 
-rangeDecoder: Json.Decoder Range
+rangeDecoder : Json.Decoder Range
 rangeDecoder =
     Json.map2 Range.range
         (Json.field "from" Json.int)
         (Json.field "to" Json.int)
-
