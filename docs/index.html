@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>elm-rich-textarea</title>
+    <script src="elm.js"></script>
+    <style type="text/css">
+        /* make it look like a default textarea (optional) */
+        /*body {*/
+        /*font-family: monospace*/
+        /*}*/
+    </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+    const app = Elm.Main.init({node: document.getElementById("app")});
+
+    // wire parsing ports !
+    app.ports.highlight.subscribe(highlightRequest => {
+        const styles = highlight(highlightRequest.text);
+        app.ports.onHighlightResponse.send({
+            id: highlightRequest.id,
+            styles: styles
+        });
+    });
+
+
+    // here below is the dumbest highlighter ever...
+
+    function highlight(str) {
+        return highlightWords(str, [ "let", "in" ], "keyword").concat(
+            highlightWords(str, [ "foo", "bar" ], "identifier")
+        );
+    }
+
+    function highlightWords(str, words, style) {
+        return words.map(k => highlightWord(0, str, k, style)).flat();
+    }
+
+    function highlightWord(index, str, word, style) {
+        const i = str.indexOf(word);
+        if (i === -1) {
+            return [];
+        } else {
+            const rest = str.substring(i + word.length);
+            return [
+                {
+                    "range": {
+                        "from": index + i,
+                        "to": index + i + word.length
+                    },
+                    "style": style
+                }
+            ].concat(
+                highlightWord(index + i + word.length, rest, word, style)
+            );
+        }
+    }
+
+
+
+</script>
+</body>
+</html>
