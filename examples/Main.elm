@@ -46,16 +46,35 @@ view model =
         [ h1
             []
             [ text "Textarea... with style !" ]
-        , h2
+        , p
             []
-            [ text "Pure Elm" ]
-        , WithElmParser.view model.pureModel
-            |> Html.map PureMsg
-        , h2
-            []
-            [ text "With ports"]
-        , WithPorts.view model.portsModel
-            |> Html.map PortsMsg
+            [ text "Examples app for the "
+            , a
+                [ href "https://github.com/vankeisb/elm-rich-textarea" ]
+                [ text "elm-rich-textarea" ]
+            , text " Elm package."
+            ]
+        , div
+            [ style "display" "flex"
+            , style "flex-direction" "row"
+            ]
+            [ div
+                []
+                [ h2
+                    []
+                    [ text "Elm highlight" ]
+                , WithElmParser.view model.pureModel
+                    |> Html.map PureMsg
+                ]
+            , div
+                [ style "margin-left" "16px" ]
+                [ h2
+                    []
+                    [ text "JS highlight (with ports)"]
+                , WithPorts.view model.portsModel
+                    |> Html.map PortsMsg
+                ]
+            ]
         ]
 
 
