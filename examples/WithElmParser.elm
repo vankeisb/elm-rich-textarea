@@ -39,15 +39,11 @@ type alias Model =
 init : String -> ( Model, Cmd Msg )
 init idPrefix =
     let
-        initialText =
-            "let\n  foo = 1\nin\n  foo + bar"
-
-
-        -- init the textarea : we pass the text and
-        -- the styles for this text
         ( m, c ) =
-            Textarea.init
-                (Textarea.defaultInitData idPrefix initialText)
+            Textarea.init <|
+                Textarea.defaultInitData
+                    idPrefix
+                    "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m
       }
