@@ -11,7 +11,11 @@ module Textarea exposing
     , OutMsg(..)
     , HighlightRequest
     , applyStyles
+    , encodeHighlightRequest
+    , HighlightResponse
+    , highlightResponseDecoder
     )
+
 
 import Array
 import Browser
@@ -1058,3 +1062,51 @@ applyStyles highlightId styles (Model model) =
             |> computeStyledTexts
     else
         Model model
+
+
+
+{-
+    Support for ports : encoding and decoding of highlight requests and responses...
+-}
+
+
+encodeHighlightRequest: HighlightRequest -> Encode.Value
+encodeHighlightRequest r =
+    Encode.object
+        [ ("id", encodeHighlightId r.id)
+        , ("text", Encode.string r.text)
+        ]
+
+
+type alias HighlightResponse s =
+    { id: HighlightId
+    , styles : List (Range, s)
+    }
+
+
+highlightResponseDecoder : Json.Decoder s -> Json.Decoder (HighlightResponse s)
+highlightResponseDecoder styleDecoder =
+    let
+        rangeAndStyleDecoder: Json.Decoder (Range, s)
+        rangeAndStyleDecoder =
+            Json.map2
+                (\range styleValue ->
+                    (range, styleValue)
+                )
+                (Json.field "range" rangeDecoder)
+                (Json.field "style" styleDecoder)
+
+    in
+    Json.map2 HighlightResponse
+        (Json.field "id" highlightIdDecoder)
+        (Json.field "styles" <|
+            Json.list rangeAndStyleDecoder
+        )
+
+
+rangeDecoder: Json.Decoder Range
+rangeDecoder =
+    Json.map2 Range.range
+        (Json.field "from" Json.int)
+        (Json.field "to" Json.int)
+

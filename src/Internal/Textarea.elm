@@ -6,6 +6,8 @@ module Internal.Textarea exposing
     , lineSize
     , HighlightId
     , initialHighlightId
+    , encodeHighlightId
+    , highlightIdDecoder
     )
 
 import Array
@@ -13,6 +15,8 @@ import Browser.Dom as Dom
 import Debounce
 import Range exposing (Range)
 import Internal.Styles exposing (StyledText, Styles)
+import Json.Encode as Encode
+import Json.Decode as Decode
 
 
 type Msg
@@ -96,3 +100,13 @@ lineSize n text =
         |> Tuple.second
         |> Array.fromList
         |> Array.get n
+
+
+encodeHighlightId: HighlightId -> Encode.Value
+encodeHighlightId (HighlightId id) =
+    Encode.int id
+
+
+highlightIdDecoder: Decode.Decoder HighlightId
+highlightIdDecoder =
+    Decode.map HighlightId Decode.int
