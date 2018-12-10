@@ -1,15 +1,16 @@
 module Textarea exposing
-    ( Highlighter
-    , InitData
+    ( InitData
     , Model
     , Msg
-    , ReturnStyles
-    , UpdateData
     , attributedRenderer
     , init
     , subscriptions
     , update
     , view
+    , HighlightId
+    , OutMsg(..)
+    , HighlightRequest
+    , applyStyles
     )
 
 import Array
@@ -34,18 +35,41 @@ type alias Model s =
     Internal.Textarea.Model s
 
 
-type alias Msg s =
-    Internal.Textarea.Msg s
+type alias Msg =
+    Internal.Textarea.Msg
 
 
-type alias InitData s =
-    { highlighter : Highlighter s
-    , initialText : String
-    , idPrefix : String
+type alias HighlightId =
+    Internal.Textarea.HighlightId
+
+
+type alias HighlightRequest =
+    { id: HighlightId
+    , text: String
     }
 
 
-init : InitData s -> ( Model s, Cmd (Msg s) )
+type OutMsg
+    = RequestHighlight HighlightRequest
+
+
+type alias InitData s =
+    { initialText : String
+    , idPrefix : String
+    , initialStyles: List (Range, s)
+    , debounceMs: Float
+    }
+
+
+
+debounceConfig : Float -> Debounce.Config Msg
+debounceConfig ms =
+    { strategy = Debounce.later ms
+    , transform = DebounceMsg
+    }
+
+
+init : InitData s -> ( Model s, Cmd Msg )
 init initData =
     let
         initialModelData =
@@ -64,18 +88,49 @@ init initData =
                 , scrollLeft = 0
                 }
             , selectingAt = Nothing
-            , highlightId = 0
+            , highlightId = initialHighlightId
             , debounce = Debounce.init
+            , debounceMs = initData.debounceMs
             }
     in
     ( Model initialModelData
-        |> computeStyles initData.highlighter
+        |> applyStyles initialHighlightId initData.initialStyles
+        |> computeStyledTexts
     , Cmd.none
     )
         |> getViewportPos
 
 
-focusTextarea : ModelData s -> Cmd (Msg s)
+requestHighlight: (Model m, Cmd Msg) -> (Model m, Cmd Msg, Maybe OutMsg)
+requestHighlight (Model model, cmd) =
+    let
+        (debounce, debounceCmd) =
+            Debounce.push (debounceConfig model.debounceMs) model.highlightId model.debounce
+    in
+    ( Model
+        { model
+            | debounce = debounce
+        }
+    , Cmd.batch
+        [ cmd
+        , debounceCmd
+        ]
+    )
+        |> noOut
+
+
+withOutMsg: Maybe OutMsg -> (Model s, Cmd Msg) -> (Model s, Cmd Msg, Maybe OutMsg)
+withOutMsg outMsg (model, cmd) =
+    (model, cmd, outMsg)
+
+
+noOut: (Model s, Cmd Msg) -> (Model s, Cmd Msg, Maybe OutMsg)
+noOut =
+    withOutMsg Nothing
+
+
+
+focusTextarea : ModelData s -> Cmd Msg
 focusTextarea d =
     Dom.focus (textareaId d)
         |> Task.attempt Focused
@@ -117,10 +172,7 @@ devMode =
 
 
 
--- TODO introduce ViewData
-
-
-view : (Msg s -> m) -> Renderer s m -> Model s -> Html m
+view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
         lines =
@@ -270,46 +322,6 @@ view lift renderer (Model d) =
         ]
 
 
-type alias Highlighter s =
-    String -> List ( Range, s )
-
-
-computeStylesAsync : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
-computeStylesAsync updateData ( Model model, cmd ) =
-    let
-        ( debounce, cmd1 ) =
-            Debounce.push debounceConfig model.text model.debounce
-    in
-    ( computeStyledTexts <| Model { model | debounce = debounce }
-    , Cmd.batch
-        [ cmd
-        , cmd1
-        ]
-        |> Cmd.map updateData.lift
-    )
-
-
-liftCmd : UpdateData m s -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd m )
-liftCmd updateData ( model, cmd ) =
-    ( model, Cmd.map updateData.lift cmd )
-
-
-computeStyles : Highlighter s -> Model s -> Model s
-computeStyles highlighter (Model d) =
-    Model d
-        |> updateStyles (highlighter d.text)
-
-
-updateStyles : List ( Range, s ) -> Model s -> Model s
-updateStyles styles (Model d) =
-    Model
-        { d
-            | styles =
-                S.empty
-                    |> S.addStyles styles
-        }
-        |> computeStyledTexts
-
 
 computeStyledTexts : Model s -> Model s
 computeStyledTexts (Model d) =
@@ -334,6 +346,7 @@ computeStyledTexts (Model d) =
                         )
                         ( 0, [] )
                     |> Tuple.second
+                    |> Debug.log "styledTexts"
         }
 
 
@@ -341,7 +354,7 @@ noCmd m =
     ( m, Cmd.none )
 
 
-setSelection : Maybe Range -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
+setSelection : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 setSelection r ( Model d, c ) =
     ( Model
         { d
@@ -353,29 +366,22 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
+updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg) -> ( Model s, Cmd Msg )
 updateIfSelecting fun ( Model model, c ) =
-    if model.selectingAt /= Nothing then
-        ( Model model, c )
-            |> Tuple.mapFirst fun
-            |> scrollCaretIntoView model.selection
+    (
+        if model.selectingAt /= Nothing then
+            ( Model model, c )
+                |> Tuple.mapFirst fun
+                |> scrollCaretIntoView model.selection
 
-    else
-        ( Model model, c )
-
-
-type alias UpdateData msg s =
-    { onHighlight : ReturnStyles msg s -> String -> Cmd msg
-    , lift : Msg s -> msg
-    }
+        else
+            ( Model model, c )
+    )
 
 
-type alias ReturnStyles msg s =
-    List ( Range, s ) -> Cmd msg
 
-
-update : UpdateData m s -> Msg s -> Model s -> ( Model s, Cmd m )
-update updateData msg (Model model) =
+update : Msg -> Model s -> ( Model s, Cmd Msg, Maybe OutMsg )
+update msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
@@ -392,35 +398,34 @@ update updateData msg (Model model) =
                         else
                             model.styles
                 }
+                |> computeStyledTexts
                 |> noCmd
                 |> setSelection (Just (Range.range start end))
-                |> computeStylesAsync updateData
+                |> requestHighlight
 
         OnKeyDown keyCode start end ->
             onKey True keyCode start end model
-                |> computeStylesAsync updateData
+
 
         OnKeyUp keyCode start end ->
             onKey False keyCode start end model
-                |> computeStylesAsync updateData
 
         MouseDown i ->
             setCaretPos i (Model model)
-                |> liftCmd updateData
+                |> noOut
 
         MouseUp i ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
-                |> liftCmd updateData
+                |> noOut
 
         MouseOver i ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting (expandSelection i)
-                |> liftCmd updateData
+                |> noOut
+
 
         MouseClicks i count ->
             if count == 1.0 then
@@ -428,43 +433,41 @@ update updateData msg (Model model) =
                     -- TODO simplify?
                     |> setCaretPos i
                     |> updateIfSelecting (expandSelection i >> setSelectingAt Nothing)
-                    |> liftCmd updateData
+                    |> noOut
+
 
             else if count == 2.0 then
-                ( Model model
+                Model model
                     |> expandWordSelection i
-                , Cmd.none
-                )
-                    |> liftCmd updateData
+                    |> noCmd
+                    |> noOut
 
             else if count == 3.0 then
-                ( Model model
+                Model model
                     |> expandLineSelection i
-                , Cmd.none
-                )
-                    |> liftCmd updateData
+                    |> noCmd
+                    |> noOut
 
             else
-                ( Model model
-                , Cmd.none
-                )
+                Model model
+                    |> noCmd
+                    |> noOut
 
         MouseOverLine n ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
                             |> Maybe.map (\s -> Model m |> expandSelection (s - 1))
                             |> Maybe.withDefault (Model m)
                     )
-                |> liftCmd updateData
+                |> noOut
+
 
         MouseUpLine n ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting
                     (\(Model m) ->
                         lineSize n m.text
@@ -472,7 +475,8 @@ update updateData msg (Model model) =
                             |> Maybe.map (setSelectingAt Nothing)
                             |> Maybe.withDefault (Model m)
                     )
-                |> liftCmd updateData
+                |> noOut
+
 
         MouseDownLine lineIndex ->
             -- place caret at the end of the line
@@ -482,70 +486,70 @@ update updateData msg (Model model) =
                         setCaretPos (s - 1) (Model model)
                     )
                 |> Maybe.withDefault
-                    ( Model model, Cmd.none )
-                |> liftCmd updateData
+                    (noCmd <| Model model)
+                |> noOut
 
         BackgroundMouseDown ->
             -- place caret at the end of the text
             setCaretPos
                 (String.length model.text)
                 (Model model)
-                |> liftCmd updateData
+                |> noOut
+
 
         BackgroundMouseOver ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting (expandSelection <| String.length model.text)
-                |> liftCmd updateData
+                |> noOut
 
         BackgroundMouseUp ->
-            ( Model model
-            , Cmd.none
-            )
+            Model model
+                |> noCmd
                 |> updateIfSelecting (expandSelection (String.length model.text) >> setSelectingAt Nothing)
-                |> liftCmd updateData
+                |> noOut
+
 
         BackgroundMouseLeft ->
-            ( Model model |> setSelectingAt Nothing
-            , Cmd.none
-            )
-                |> liftCmd updateData
+            Model model
+                |> setSelectingAt Nothing
+                |> noCmd
+                |> noOut
 
         BackgroundMouseEnter buttons ->
             if 1 == buttons then
-                ( Model model |> setSelectingAt (Just 0)
-                , Cmd.none
-                )
-                    |> liftCmd updateData
-
+                Model model
+                    |> setSelectingAt (Just 0)
+                    |> noCmd
+                    |> noOut
             else
-                ( Model model
-                , Cmd.none
-                )
+               Model model
+                    |> noCmd
+                    |> noOut
 
         Focused (Ok ()) ->
-            ( Model
+            Model
                 { model
                     | focused = True
                 }
-            , Cmd.none
-            )
-                |> liftCmd updateData
+                |> noCmd
+                |> noOut
 
         Focused (Err _) ->
-            ( Model model, Cmd.none )
-                |> liftCmd updateData
+            Model model
+                |> noCmd
+                |> noOut
+
 
         Blurred ->
-            ( Model
+            Model
                 { model
                     | focused = False
                 }
                 |> setSelectingAt Nothing
-            , Cmd.none
-            )
-                |> liftCmd updateData
+                |> noCmd
+                |> noOut
+
 
         GetViewportPos element ->
             case element of
@@ -554,7 +558,7 @@ update updateData msg (Model model) =
                         box =
                             model.viewportBox
                     in
-                    ( Model
+                    Model
                         { model
                             | viewportBox =
                                 { box
@@ -562,14 +566,14 @@ update updateData msg (Model model) =
                                     , y = e.element.y
                                 }
                         }
-                    , Cmd.none
-                    )
+                        |> noCmd
                         |> getViewportSize
-                        |> liftCmd updateData
+                        |> noOut
 
                 Err _ ->
-                    ( Model model, Cmd.none )
-                        |> liftCmd updateData
+                    Model model
+                        |> noCmd
+                        |> noOut
 
         GetViewport vp ->
             ( case vp of
@@ -593,7 +597,7 @@ update updateData msg (Model model) =
                     Model model
             , Cmd.none
             )
-                |> liftCmd updateData
+                |> noOut
 
         GetCharViewport element ->
             case element of
@@ -675,11 +679,12 @@ update updateData msg (Model model) =
                     ( Model model
                     , setScroll newScrollLeft newScrollTop
                     )
-                        |> liftCmd updateData
+                        |> noOut
 
                 Err _ ->
                     ( Model model, Cmd.none )
-                        |> liftCmd updateData
+                        |> noOut
+
 
         Scrolled x y ->
             let
@@ -699,58 +704,50 @@ update updateData msg (Model model) =
                 }
             , Cmd.none
             )
-                |> liftCmd updateData
+                |> noOut
+
 
         NoOp ->
             ( Model model, Cmd.none )
-                |> liftCmd updateData
+                |> noOut
 
-        RequestHighlight text ->
+        DebounceMsg m ->
             let
-                model1 =
-                    { model | highlightId = model.highlightId + 1 }
-
-                return =
-                    \styles ->
-                        Task.succeed styles
-                            |> Task.perform (NewHighlight model1.highlightId)
-                            |> Cmd.map updateData.lift
-            in
-            ( Model model1, updateData.onHighlight return text )
-
-        NewHighlight highlightId styles ->
-            if model.highlightId == highlightId then
-                ( updateStyles styles <| Model model, Cmd.none )
-
-            else
-                ( Model model, Cmd.none )
-
-        DebounceMsg msg1 ->
-            let
-                save text =
-                    Task.perform RequestHighlight <| Task.succeed text
-
-                ( debounce, cmd ) =
+                (debounce, cmd) =
                     Debounce.update
-                        debounceConfig
-                        (Debounce.takeLast save)
-                        msg1
+                        (debounceConfig model.debounceMs)
+                        (Debounce.takeLast
+                            (\_ ->
+                                Task.succeed ()
+                                    |> Task.perform (\_ -> TriggerHighlight)
+                            )
+                        )
+                        m
                         model.debounce
             in
-            ( Model { model | debounce = debounce }
+            ( Model
+                { model
+                    | debounce =
+                        debounce
+                }
             , cmd
             )
-                |> liftCmd updateData
+                |> noOut
 
 
-debounceConfig : Debounce.Config (Msg s)
-debounceConfig =
-    { strategy = Debounce.later 1000
-    , transform = DebounceMsg
-    }
+        TriggerHighlight ->
+            Model model
+                |> noCmd
+                |> withOutMsg
+                        ( Just <|
+                            RequestHighlight
+                                { id = model.highlightId
+                                , text = model.text
+                                }
+                        )
 
 
-setCaretPos : Int -> Model s -> ( Model s, Cmd (Msg s) )
+setCaretPos : Int -> Model s -> ( Model s, Cmd Msg)
 setCaretPos i (Model d) =
     ( Model d
         |> setSelectingAt (Just i)
@@ -791,7 +788,7 @@ expandLineSelection =
     expanSelectionWith lineRangeAt
 
 
-onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd (Msg s) )
+onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
 onKey isDown keyCode start end d =
     let
         ( newText, newSel ) =
@@ -826,12 +823,14 @@ onKey isDown keyCode start end d =
         { d
             | text = newText
         }
+        |> computeStyledTexts
         |> noCmd
         |> getViewportPos
         |> setSelection newSel
+        |> requestHighlight
 
 
-getViewportPos : ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
+getViewportPos : ( Model s, Cmd Msg) -> ( Model s, Cmd Msg)
 getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -842,7 +841,7 @@ getViewportPos ( Model d, c ) =
     )
 
 
-getViewportSize : ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
+getViewportSize : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 getViewportSize ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -853,7 +852,7 @@ getViewportSize ( Model d, c ) =
     )
 
 
-scrollCaretIntoView : Maybe Range -> ( Model s, Cmd (Msg s) ) -> ( Model s, Cmd (Msg s) )
+scrollCaretIntoView : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
 scrollCaretIntoView prevRange ( Model d, c ) =
     let
         scrollCmd charIndex =
@@ -908,18 +907,9 @@ scrollCaretIntoView prevRange ( Model d, c ) =
     )
 
 
-subscriptions : Model s -> Sub (Msg s)
+subscriptions : Model s -> Sub Msg
 subscriptions (Model model) =
     Sub.none
-
-
-addStyles : List ( Range, s ) -> Model s -> Model s
-addStyles styles (Model d) =
-    Model
-        { d
-            | styles =
-                S.addStyles styles d.styles
-        }
 
 
 mouseEvent : String -> (Int -> m) -> Attribute m
@@ -979,7 +969,7 @@ adjustIndex offsetX clientWidth =
         0
 
 
-attributedRenderer : Model s -> (Msg s -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
+attributedRenderer : Model s -> (Msg -> m) -> (List s -> List (Html.Attribute m)) -> Renderer s m
 attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange styles =
     let
         dataFrom f =
@@ -1052,3 +1042,17 @@ attributedRenderer (Model m) lift attrsSupplier isPrefix str from selRange style
                         ]
                 )
         )
+
+
+applyStyles: HighlightId -> List (Range, s) -> Model s -> Model s
+applyStyles highlightId styles (Model model) =
+    if model.highlightId == highlightId then
+        Model
+            { model
+                | styles =
+                    S.empty
+                        |> S.addStyles (Debug.log "styles" styles)
+            }
+            |> computeStyledTexts
+    else
+        Model model

@@ -4,6 +4,8 @@ module Internal.Textarea exposing
     , ModelData
     , Msg(..)
     , lineSize
+    , HighlightId
+    , initialHighlightId
     )
 
 import Array
@@ -13,7 +15,7 @@ import Range exposing (Range)
 import Internal.Styles exposing (StyledText, Styles)
 
 
-type Msg s
+type Msg
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
@@ -35,10 +37,18 @@ type Msg s
     | GetViewport (Result Dom.Error Dom.Viewport)
     | GetCharViewport (Result Dom.Error Dom.Element)
     | Scrolled Float Float
-    | NoOp
-    | RequestHighlight String
-    | NewHighlight Int (List ( Range, s ))
     | DebounceMsg Debounce.Msg
+    | TriggerHighlight
+    | NoOp
+
+
+type HighlightId =
+    HighlightId Int
+
+
+initialHighlightId: HighlightId
+initialHighlightId =
+    HighlightId 0
 
 
 type alias ModelData s =
@@ -50,8 +60,9 @@ type alias ModelData s =
     , focused : Bool
     , viewportBox : Box
     , selectingAt : Maybe Int
-    , highlightId : Int
-    , debounce : Debounce.Debounce String
+    , highlightId : HighlightId
+    , debounce : Debounce.Debounce HighlightId
+    , debounceMs: Float
     }
 
 

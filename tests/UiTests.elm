@@ -20,7 +20,7 @@ import Textarea exposing (..)
 
 
 type Msg
-    = TextareaMsg (Textarea.Msg MyStyle)
+    = TextareaMsg Textarea.Msg
     | NoOp ( String, Int )
 
 
@@ -34,7 +34,7 @@ suite =
     describe "UI Tests"
         [ test "single line, no styles" <|
             \_ ->
-                createModelNoHl "foo bar baz"
+                createModel "foo bar baz"
                     |> renderHtml
                     |> Expect.all
                         ("foo bar baz"
@@ -63,7 +63,7 @@ suite =
                               )
                             ]
                 in
-                createModelNoHl "foo\nbar\nbaz"
+                createModel "foo\nbar\nbaz"
                     |> renderHtml
                     |> find
                         [ style "display" "flex"
@@ -78,8 +78,8 @@ suite =
                     |> E.expect (TextareaMsg <| IT.MouseDownLine 1)
         , test "do not place caret on mouse down (line)" <|
             \_ ->
-                createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl (IT.MouseDownLine 1)
+                createModel "foo\nbar\nbaz"
+                    |> update (IT.MouseDownLine 1)
                     |> Expect.all
                         [ \(IT.Model m) ->
                             Expect.equal
@@ -88,8 +88,8 @@ suite =
                         ]
         , test "when clicking the bg then the caret should not be set" <|
             \_ ->
-                createModelNoHl "foo\nbar\nbaz"
-                    |> updateNoHl IT.BackgroundMouseDown
+                createModel "foo\nbar\nbaz"
+                    |> update IT.BackgroundMouseDown
                     |> Expect.all
                         [ getSelection >> Expect.equal Nothing
                         , getSelectingAt >> Expect.equal (Just 11)
@@ -97,64 +97,55 @@ suite =
                         ]
         , test "when clicking the bg then the caret should be at the end of text" <|
             \_ ->
-                createModelNoHl "foo\nbar\nbaz"
+                createModel "foo\nbar\nbaz"
                     |> whileSelectingAt 11
-                    |> updateNoHl IT.BackgroundMouseUp
+                    |> update IT.BackgroundMouseUp
                     |> renderHtml
                     |> has [ hasCaretAt 11 ]
         , test "when mouse down on the line then the caret should be at the end of this line" <|
             \_ ->
-                createModelNoHl "foo\nbar\nbaz"
+                createModel "foo\nbar\nbaz"
                     |> whileSelectingAt 3
-                    |> updateNoHl (IT.MouseUpLine 0)
+                    |> update (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , test "when clicking (mouse up and down) on the line then the caret should be at the end of this line" <|
             \_ ->
-                createModelNoHl "foo\nbar\nbaz"
+                createModel "foo\nbar\nbaz"
                     |> withSelection (range 3 3)
                     |> whileSelectingAt 3
-                    |> updateNoHl (IT.MouseUpLine 0)
+                    |> update (IT.MouseUpLine 0)
                     |> renderHtml
                     |> has [ hasCaretAt 3 ]
         , describe "mouse selection"
             [ test "expand to end of line" <|
                 \_ ->
-                    createModelNoHl "gnu\nbar\nbaz"
+                    createModel "gnu\nbar\nbaz"
                         |> withSelection (range 1 2)
                         |> whileSelectingAt 1
-                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> update (IT.MouseOverLine 0)
                         |> renderHtml
                         |> expectSelectedText "nu"
             ]
         ]
 
 
-myUpdateData : Textarea.UpdateData Msg MyStyle
-myUpdateData =
-    { lift = TextareaMsg
-    , onHighlight = asyncEmptyHighlighter
-    }
 
+update : IT.Msg -> Model MyStyle -> Model MyStyle
+update msg model =
+    let
+        (m,_,_) =
+            Textarea.update msg model
+    in
+    m
 
-update : Textarea.UpdateData Msg MyStyle -> IT.Msg MyStyle -> Model MyStyle -> Model MyStyle
-update updateData msg model =
-    Textarea.update updateData msg model
-        |> Tuple.first
-
-
-updateNoHl =
-    update myUpdateData
+--updateNoHl =
+--    update emptyHighlighter
 
 
 emptyHighlighter =
     \text ->
         []
-
-
-asyncEmptyHighlighter : ReturnStyles msg s -> String -> Cmd msg
-asyncEmptyHighlighter =
-    \return _ -> return []
 
 
 renderer : List MyStyle -> List (Html.Attribute Msg)
@@ -176,18 +167,16 @@ renderer myStyles =
             []
 
 
-createModel : Highlighter MyStyle -> String -> Model MyStyle
-createModel hl str =
+createModel : String -> Model MyStyle
+createModel str =
     Textarea.init
         { idPrefix = "test-ta"
-        , highlighter = hl
         , initialText = str
+        , initialStyles = []
+        , debounceMs = 1000
         }
         |> Tuple.first
 
-
-createModelNoHl =
-    createModel emptyHighlighter
 
 
 withSelection : Range -> Model s -> Model s
@@ -256,18 +245,18 @@ updateSuite =
         [ describe "mouse selection"
             [ test "expand to end of line" <|
                 \_ ->
-                    createModelNoHl "foo\nbar\nbaz"
+                    createModel "foo\nbar\nbaz"
                         |> withSelection (range 3 3)
                         |> whileSelectingAt 3
-                        |> updateNoHl (IT.MouseUpLine 0)
+                        |> update (IT.MouseUpLine 0)
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
             , test "expand at end of line" <|
                 \_ ->
-                    createModelNoHl "foo\nbar\nbaz"
+                    createModel "foo\nbar\nbaz"
                         |> withSelection (range 3 3)
                         |> whileSelectingAt 3
-                        |> updateNoHl (IT.MouseOverLine 0)
+                        |> update (IT.MouseOverLine 0)
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
             ]

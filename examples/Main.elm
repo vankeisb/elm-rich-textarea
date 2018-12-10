@@ -1,4 +1,4 @@
-port module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, renderer, subscriptions, update, view)
+port module Main exposing (..)
 
 import Browser
 import Html exposing (..)
@@ -13,10 +13,8 @@ import Textarea
 
 
 type Msg
-    = TextareaMsg (Textarea.Msg MyStyle)
+    = TextareaMsg Textarea.Msg
     | TextClicked
-    | DelayHighlight (Textarea.ReturnStyles Msg MyStyle) (List ( Range, MyStyle ))
-    | UpdateHighlight (List ( Range, MyStyle ))
 
 
 type MyStyle
@@ -26,22 +24,24 @@ type MyStyle
 
 type alias Model =
     { textareaModel : Textarea.Model MyStyle
-    , returnHighlight : Maybe (List ( Range, MyStyle ) -> Cmd Msg)
     }
 
 
 init : String -> ( Model, Cmd Msg )
 init idPrefix =
     let
+        initialText =
+            "let\n  foo = 1\nin\n  foo + bar"
+
         ( m, c ) =
             Textarea.init
                 { idPrefix = "my-ta"
-                , highlighter = highlighter
-                , initialText = "let\n  foo = 1\nin\n  foo + bar"
+                , initialText = initialText
+                , initialStyles = highlight initialText
+                , debounceMs = 1000
                 }
     in
     ( { textareaModel = m
-      , returnHighlight = Nothing
       }
     , Cmd.map TextareaMsg c
     )
@@ -89,9 +89,12 @@ renderer myStyles =
             []
 
 
-highlighter : String -> List ( Range, MyStyle )
-highlighter text =
+highlight : String -> List ( Range, MyStyle )
+highlight text =
     let
+        x =
+            Debug.log "hlText" text
+
         stylify style word =
             String.indexes word text
                 |> List.map
@@ -131,49 +134,35 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                updateData =
-                    { lift = TextareaMsg
-                    , onHighlight = onHighlight
-                    }
+                ( tm, c, o ) =
+                    Textarea.update sub model.textareaModel
 
-                ( tm, c ) =
-                    Textarea.update updateData sub model.textareaModel
+                tm2 =
+                    case o of
+                        Just (Textarea.RequestHighlight hr) ->
+                            Textarea.applyStyles
+                                hr.id
+                                (highlight hr.text)
+                                tm
+
+                        Nothing ->
+                            tm
             in
             ( { model
                 | textareaModel =
-                    tm
+                    tm2
               }
-            , c
+            , Cmd.map TextareaMsg c
             )
 
         TextClicked ->
             ( model, Cmd.none )
 
-        DelayHighlight return list ->
-            if model.returnHighlight == Nothing then
-                ( { model | returnHighlight = Just return }
-                , delayHighlight list
-                )
-
-            else
-                ( model, Cmd.none )
-
-        UpdateHighlight list ->
-            case model.returnHighlight of
-                Just return ->
-                    ( { model | returnHighlight = Nothing }
-                    , return list
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
-
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ delayed (UpdateHighlight << decodeHighlight)
-        , Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
+        [ Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
         ]
 
 
@@ -187,73 +176,6 @@ main =
         , view = view
         }
 
-
-onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
-onHighlight return text =
-    Task.succeed (highlighter text)
-        |> Task.perform (DelayHighlight return)
-
-
-delayHighlight : List ( Range, MyStyle ) -> Cmd Msg
-delayHighlight list =
-    list
-        |> encodeHighlight
-        |> delay
-
-
-port delay : E.Value -> Cmd msg
-
-
-port delayed : (E.Value -> msg) -> Sub msg
-
-
-decodeHighlight : E.Value -> List ( Range, MyStyle )
-decodeHighlight value =
-    value
-        |> D.decodeValue highlightDecoder
-        |> Result.withDefault []
-
-
-encodeHighlight : List ( Range, MyStyle ) -> E.Value
-encodeHighlight list =
-    list
-        |> E.list
-            (\( range, mystyle ) ->
-                E.object
-                    [ ( "range", encodeRange range )
-                    , ( "mystyle", encodeMyStyle mystyle )
-                    ]
-            )
-
-
-highlightDecoder : D.Decoder (List ( Range, MyStyle ))
-highlightDecoder =
-    D.list <|
-        D.map2 Tuple.pair
-            (D.field "range" rangeDecoder)
-            (D.field "mystyle" myStyleDecoder)
-
-
-rangeDecoder : D.Decoder Range
-rangeDecoder =
-    D.map2 Range.range (D.index 0 D.int) (D.index 1 D.int)
-
-
-encodeRange : Range -> E.Value
-encodeRange range =
-    E.list E.int <| tupleAsList <| Range.getBounds range
-
-
-tupleAsList : ( a, a ) -> List a
-tupleAsList ( a, b ) =
-    [ a, b ]
-
-
-myStyleDecoder : D.Decoder MyStyle
-myStyleDecoder =
-    D.map fromString D.string
-
-
 fromString : String -> MyStyle
 fromString style =
     case style of
@@ -265,13 +187,3 @@ fromString style =
 
         _ ->
             Identifier
-
-
-encodeMyStyle : MyStyle -> E.Value
-encodeMyStyle style =
-    case style of
-        Keyword ->
-            E.string "Keyword"
-
-        Identifier ->
-            E.string "Identifier"
