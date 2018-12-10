@@ -3,7 +3,7 @@ module TextUtilTests exposing (suite)
 import Expect exposing (Expectation)
 import Range exposing (range)
 import Test exposing (..)
-import TextUtil exposing (lineRangeAt, wordRangeAt)
+import TextUtil exposing (lineRangeAt, maybeOrElse, wordRangeAt)
 
 
 suite : Test
@@ -77,5 +77,17 @@ suite =
                     "foo\nbar\ngnu"
                         |> lineRangeAt 5
                         |> Expect.equal (Just <| range 4 7)
+            ]
+        , describe "maybe util"
+            [ test "keep" <|
+                \_ ->
+                    Just 13
+                        |> maybeOrElse (Just 14)
+                        |> Expect.equal (Just 13)
+            , test "recover" <|
+                \_ ->
+                    Nothing
+                        |> maybeOrElse (Just 13)
+                        |> Expect.equal (Just 13)
             ]
         ]

@@ -1,4 +1,4 @@
-module TextUtil exposing (lineRangeAt, wordRangeAt)
+module TextUtil exposing (lineRangeAt, maybeOrElse, wordRangeAt)
 
 import Range exposing (Range, range)
 
@@ -23,17 +23,22 @@ delimitedRangeAt isDelim pos text =
 
         left =
             indexed
-                |> List.filter (\( i, c ) -> i < pos && isDelim c)
-                |> List.map Tuple.first
-                |> List.reverse
-                |> List.head
+                |> List.foldr
+                    (\ic acc ->
+                        acc
+                            |> maybeOrElse (candidatePosition (atLeft isDelim pos) ic)
+                    )
+                    Nothing
                 |> Maybe.withDefault -1
 
         right =
             indexed
-                |> List.filter (\( i, c ) -> i >= pos && isDelim c)
-                |> List.map Tuple.first
-                |> List.head
+                |> List.foldl
+                    (\ic acc ->
+                        acc
+                            |> maybeOrElse (candidatePosition (atRight isDelim pos) ic)
+                    )
+                    Nothing
                 |> Maybe.withDefault (String.length text)
     in
     if String.isEmpty text || right == pos then
@@ -44,6 +49,32 @@ delimitedRangeAt isDelim pos text =
 
     else
         Nothing
+
+
+maybeOrElse : Maybe a -> Maybe a -> Maybe a
+maybeOrElse recover maybe =
+    maybe
+        |> Maybe.map Just
+        |> Maybe.withDefault recover
+
+
+candidatePosition : (( Int, Char ) -> Bool) -> ( Int, Char ) -> Maybe Int
+candidatePosition pred ( i, c ) =
+    if pred ( i, c ) then
+        Just i
+
+    else
+        Nothing
+
+
+atRight : (Char -> Bool) -> Int -> (( Int, Char ) -> Bool)
+atRight isDelim pos ( i, c ) =
+    i >= pos && isDelim c
+
+
+atLeft : (Char -> Bool) -> Int -> (( Int, Char ) -> Bool)
+atLeft isDelim pos ( i, c ) =
+    i < pos && isDelim c
 
 
 isWhitespace : Char -> Bool
