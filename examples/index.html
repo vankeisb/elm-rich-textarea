@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>elm-textarea</title>
+    <title>elm-rich-textarea</title>
     <script src="elm.js"></script>
     <style type="text/css">
         /* make it look like a default textarea (optional) */
@@ -17,9 +17,9 @@
     const app = Elm.Main.init({node: document.getElementById("app")});
 
     // wire parsing ports !
-    app.ports.parse.subscribe(highlightRequest => {
+    app.ports.highlight.subscribe(highlightRequest => {
         const styles = highlight(highlightRequest.text);
-        app.ports.parseResult.send({
+        app.ports.onHighlightResponse.send({
             id: highlightRequest.id,
             styles: styles
         });

@@ -47,10 +47,7 @@ init idPrefix =
         -- the styles for this text
         ( m, c ) =
             Textarea.init
-                { idPrefix = idPrefix
-                , initialText = initialText
-                , debounceMs = 1000
-                }
+                (Textarea.defaultInitData idPrefix initialText)
     in
     ( { textareaModel = m
       }

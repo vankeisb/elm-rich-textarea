@@ -14,6 +14,7 @@ module Textarea exposing
     , encodeHighlightRequest
     , HighlightResponse
     , highlightResponseDecoder
+    , defaultInitData
     )
 
 
@@ -69,6 +70,14 @@ debounceConfig : Float -> Debounce.Config Msg
 debounceConfig ms =
     { strategy = Debounce.later ms
     , transform = DebounceMsg
+    }
+
+
+defaultInitData: String -> String -> InitData
+defaultInitData idPrefix initialText =
+    { initialText = initialText
+    , idPrefix = idPrefix
+    , debounceMs = 200
     }
 
 

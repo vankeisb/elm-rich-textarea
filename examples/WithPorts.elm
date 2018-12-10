@@ -48,10 +48,7 @@ init idPrefix =
         -- the styles for this text
         ( m, c ) =
             Textarea.init
-                { idPrefix = idPrefix
-                , initialText = initialText
-                , debounceMs = 1000
-                }
+                (Textarea.defaultInitData idPrefix initialText)
     in
     ( { textareaModel = m
       }
@@ -106,7 +103,7 @@ update msg model =
                 parseCmd =
                     case o of
                         Just (Textarea.RequestHighlight hr) ->
-                            parse <| Textarea.encodeHighlightRequest hr
+                            highlight <| Textarea.encodeHighlightRequest hr
 
                         Nothing ->
                             Cmd.none
@@ -157,10 +154,10 @@ update msg model =
     Ports used for parsing with JS
 -}
 
-port parse: E.Value -> Cmd m
+port highlight: E.Value -> Cmd m
 
 
-port parseResult: (D.Value -> m) -> Sub m
+port onHighlightResponse: (D.Value -> m) -> Sub m
 
 
 myStyleDecoder: D.Decoder MyStyle
@@ -188,6 +185,6 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
-        , parseResult OnParseResult
+        , onHighlightResponse OnParseResult
         ]
 
