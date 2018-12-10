@@ -18,6 +18,10 @@ module Textarea exposing
     )
 
 
+{-| Rich textarea TEA component.
+-}
+
+
 import Array
 import Browser
 import Browser.Dom as Dom
@@ -36,34 +40,38 @@ import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
 
 
+{-| Model, should be stored in the parent's -}
 type alias Model s =
     Internal.Textarea.Model s
 
 
+{-| Msgs should be relayed by the parent -}
 type alias Msg =
     Internal.Textarea.Msg
 
 
+{-| Opaque type for highlight ID. -}
 type alias HighlightId =
     Internal.Textarea.HighlightId
 
-
+{-| Highlight request indicates that the editor need to highlight the text -}
 type alias HighlightRequest =
     { id: HighlightId
     , text: String
     }
 
 
+{-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly. -}
 type OutMsg
     = RequestHighlight HighlightRequest
 
 
+{-| Init dat afor the textarea -}
 type alias InitData =
     { initialText : String
     , idPrefix : String
     , debounceMs: Float
     }
-
 
 
 debounceConfig : Float -> Debounce.Config Msg
@@ -73,6 +81,7 @@ debounceConfig ms =
     }
 
 
+{-| Create a default init data with passed id prefix and initial text -}
 defaultInitData: String -> String -> InitData
 defaultInitData idPrefix initialText =
     { initialText = initialText
@@ -81,6 +90,7 @@ defaultInitData idPrefix initialText =
     }
 
 
+{-| initialize everything, and triggers the initial highlight request. -}
 init : InitData -> ( Model s, Cmd Msg )
 init initData =
     let
@@ -183,7 +193,8 @@ devMode =
     False
 
 
-
+{-| Render the rich textarea widget.
+-}
 view : (Msg -> m) -> Renderer s m -> Model s -> Html m
 view lift renderer (Model d) =
     let
