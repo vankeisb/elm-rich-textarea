@@ -551,6 +551,7 @@ update msg (Model model) =
                 }
                 |> setSelectingAt Nothing
                 |> noCmd
+                |> setSelection Nothing
                 |> noOut
 
 
