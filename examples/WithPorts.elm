@@ -141,7 +141,11 @@ update msg model =
                     , Cmd.none
                     )
 
-                Err _ ->
+                Err e ->
+                    let
+                        x =
+                            Debug.log "failed to decode highlight response" (Debug.toString e)
+                    in
                     (model, Cmd.none)
 
 
