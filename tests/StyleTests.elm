@@ -3,7 +3,7 @@ module StyleTests exposing (MyStyle(..), expectStylesAt, myStr, suite, testStyle
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Range exposing (Range, range)
-import Styles exposing (StyledText, Styles, getStylesAt)
+import Internal.Styles as S exposing (StyledText, Styles, getStylesAt)
 import Test exposing (..)
 
 
@@ -12,12 +12,12 @@ myStr =
 
 
 testStyle12 =
-    Styles.fromList
+    S.fromList
         [ ( range 1 2, MyStyle1 ) ]
 
 
 testStyle13 =
-    Styles.fromList
+    S.fromList
         [ ( range 1 3, MyStyle1 ) ]
 
 
@@ -58,7 +58,7 @@ suite =
             , test "12 - [11..13]" <|
                 expectStylesAt 12
                     [ MyStyle1 ]
-                    (Styles.fromList
+                    (S.fromList
                         [ ( range 11 13, MyStyle1 )
                         ]
                     )
@@ -68,7 +68,7 @@ suite =
                 \_ ->
                     Expect.equalLists
                         [ StyledText myStr (range 0 10) [] ]
-                        (Styles.applyToText myStr 0 Styles.empty)
+                        (S.applyToText myStr 0 S.empty)
             , test "single style, width = 1" <|
                 \_ ->
                     Expect.equalLists
@@ -76,7 +76,7 @@ suite =
                         , StyledText "1" (range 1 2) [ MyStyle1 ]
                         , StyledText "23456789" (range 2 10) []
                         ]
-                        (Styles.applyToText myStr 0 testStyle12)
+                        (S.applyToText myStr 0 testStyle12)
             , test "single style, width = 2" <|
                 \_ ->
                     Expect.equalLists
@@ -84,7 +84,7 @@ suite =
                         , StyledText "12" (range 1 3) [ MyStyle1 ]
                         , StyledText "3456789" (range 3 10) []
                         ]
-                        (Styles.applyToText myStr 0 testStyle13)
+                        (S.applyToText myStr 0 testStyle13)
             , test "second line, width = 2" <|
                 \_ ->
                     Expect.equalLists
@@ -92,9 +92,9 @@ suite =
                         , StyledText "12" (range 11 13) [ MyStyle1 ]
                         , StyledText "3456789" (range 13 20) []
                         ]
-                        (Styles.fromList
+                        (S.fromList
                             [ ( range 11 13, MyStyle1 ) ]
-                            |> Styles.applyToText myStr 10
+                            |> S.applyToText myStr 10
                         )
             ]
         ]

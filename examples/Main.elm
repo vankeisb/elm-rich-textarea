@@ -8,7 +8,6 @@ import Json.Decode as D
 import Json.Encode as E
 import Platform.Cmd exposing (Cmd)
 import Range exposing (Range)
-import Styles
 import Task
 import Textarea
 

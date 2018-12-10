@@ -1,4 +1,4 @@
-module Styles exposing
+module Internal.Styles exposing
     ( StyledText
     , Styles
     , addStyles
@@ -14,7 +14,6 @@ import Range exposing (Range)
 
 type Styles s
     = Styles (List ( Range, s ))
-
 
 empty : Styles s
 empty =

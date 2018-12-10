@@ -10,7 +10,7 @@ import Array
 import Browser.Dom as Dom
 import Debounce
 import Range exposing (Range)
-import Styles exposing (StyledText, Styles)
+import Internal.Styles exposing (StyledText, Styles)
 
 
 type Msg s

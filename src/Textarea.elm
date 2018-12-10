@@ -24,7 +24,7 @@ import Json.Decode as Json
 import Json.Encode as Encode
 import Process
 import Range exposing (Range)
-import Styles exposing (Styles)
+import Internal.Styles as S exposing (Styles)
 import Task
 import TextUtil exposing (lineRangeAt, wordRangeAt)
 import Time exposing (Posix)
@@ -52,7 +52,7 @@ init initData =
             { idPrefix = initData.idPrefix
             , text = initData.initialText
             , selection = Nothing
-            , styles = Styles.empty
+            , styles = S.empty
             , styledTexts = []
             , focused = False
             , viewportBox =
@@ -305,8 +305,8 @@ updateStyles styles (Model d) =
     Model
         { d
             | styles =
-                Styles.empty
-                    |> Styles.addStyles styles
+                S.empty
+                    |> S.addStyles styles
         }
         |> computeStyledTexts
 
@@ -325,7 +325,7 @@ computeStyledTexts (Model d) =
                             in
                             ( offset + String.length lineWithLf
                             , res
-                                ++ [ Styles.applyToText
+                                ++ [ S.applyToText
                                         lineWithLf
                                         offset
                                         d.styles
@@ -387,7 +387,7 @@ update updateData msg (Model model) =
                                 String.length s - String.length model.text
                         in
                         if start == end && inserted /= 0 then
-                            Styles.insertAt start inserted model.styles
+                            S.insertAt start inserted model.styles
 
                         else
                             model.styles
@@ -918,7 +918,7 @@ addStyles styles (Model d) =
     Model
         { d
             | styles =
-                Styles.addStyles styles d.styles
+                S.addStyles styles d.styles
         }
 
 
