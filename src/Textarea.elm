@@ -28,6 +28,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Internal.Styles as S exposing (StyledText, Styles)
 import Internal.Textarea exposing (..)
+import Internal.Predictions exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Process
@@ -119,6 +120,7 @@ init initData =
             , highlightId = initialHighlightId
             , debounce = Debounce.init
             , debounceMs = initData.debounceMs
+            , predictions = Closed
             }
     in
     ( Model initialModelData
@@ -268,6 +270,7 @@ view lift highlighter (Model d) =
                     }
         """
             ]
+        , Html.map lift <| viewPredictions d
         , Html.map lift <|
             textarea
                 [ value d.text
@@ -297,9 +300,9 @@ view lift highlighter (Model d) =
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , custom "keydown" <|
-                    Json.map3
-                        (\keyCode start end ->
-                            { message = OnKeyDown keyCode start end
+                    Json.map4
+                        (\keyCode ctrlKey start end ->
+                            { message = OnKeyDown keyCode ctrlKey start end
                             , preventDefault =
                                 keyCode == 9
 
@@ -311,23 +314,23 @@ view lift highlighter (Model d) =
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "ctrlKey" ] Json.bool)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , custom "keyup" <|
-                    Json.map3
-                        (\keyCode start end ->
-                            { message = OnKeyUp keyCode start end
+                    Json.map4
+                        (\keyCode ctrlKey start end ->
+                            { message = OnKeyUp keyCode ctrlKey start end
                             , preventDefault =
                                 keyCode == 9
 
                             -- stop tab
                             , stopPropagation =
                                 keyCode == 9
-
-                            -- stop tab
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "ctrlKey" ] Json.bool)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , on "blur" <|
@@ -335,6 +338,24 @@ view lift highlighter (Model d) =
                 ]
                 []
         ]
+
+
+viewPredictions: ModelData s -> Html Msg
+viewPredictions d =
+    case d.predictions of
+        Closed ->
+            text ""
+
+        Loading e ->
+            div
+                [ style "opacity" "1"
+                , style "padding" "4px"
+                , style "border" "1px solid lightgrey"
+                , style "position" "absolute"
+                , style "left" <| String.fromInt (Debug.log "x" (round (e.element.x - d.viewportBox.x))) ++ "px"
+                , style "top" <| String.fromInt (Debug.log "y" (round (e.element.y - d.viewportBox.y + e.element.height))) ++ "px"
+                ]
+                [ text "Loading..."]
 
 
 renderStyledText : ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
@@ -494,11 +515,11 @@ update msg (Model model) =
                 |> setSelection (Just (Range.range start end))
                 |> requestHighlight
 
-        OnKeyDown keyCode start end ->
-            onKey True keyCode start end model
+        OnKeyDown keyCode ctrlKey start end ->
+            onKey True keyCode ctrlKey start end model
 
-        OnKeyUp keyCode start end ->
-            onKey False keyCode start end model
+        OnKeyUp keyCode ctrlKey start end ->
+            onKey False keyCode ctrlKey start end model
 
         MouseDown i ->
             setCaretPos i (Model model)
@@ -824,6 +845,21 @@ update msg (Model model) =
                             }
                     )
 
+        GetPredictionCharViewport (Ok element) ->
+            -- we've got the position, let's show the
+            -- prediction view
+            Model
+                { model
+                    | predictions =
+                        Loading element
+                }
+                |> noCmd
+                |> noOut
+
+        GetPredictionCharViewport (Err _) ->
+            -- TODO
+            Model model |> noCmd |> noOut
+
 
 triggerHighlightNow : Cmd Msg
 triggerHighlightNow =
@@ -872,8 +908,8 @@ expandLineSelection =
     expanSelectionWith lineRangeAt
 
 
-onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
-onKey isDown keyCode start end d =
+onKey : Bool -> Int -> Bool -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
+onKey isDown keyCode ctrlKey start end d =
     let
         ( newText, newSel ) =
             if keyCode == 9 && not isDown then
@@ -902,13 +938,23 @@ onKey isDown keyCode start end d =
                 ( d.text
                 , Just <| Range.range start end
                 )
+
+        -- trigger prediction if needed
+        predictionCmd =
+            if keyCode == 32 && ctrlKey then
+                Dom.getElement
+                    (charId d start)
+                    |> Task.attempt GetPredictionCharViewport
+            else
+                Cmd.none
     in
-    Model
+    ( Model
         { d
             | text = newText
         }
         |> computeStyledTexts
-        |> noCmd
+    , predictionCmd
+    )
         |> getViewportPos
         |> setSelection newSel
         |> requestHighlight

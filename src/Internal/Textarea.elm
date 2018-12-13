@@ -14,6 +14,7 @@ import Array
 import Browser.Dom as Dom
 import Debounce
 import Internal.Styles exposing (StyledText, Styles)
+import Internal.Predictions exposing (Predictions)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Range exposing (Range)
@@ -21,8 +22,8 @@ import Range exposing (Range)
 
 type Msg
     = OnInput String Int Int
-    | OnKeyDown Int Int Int
-    | OnKeyUp Int Int Int
+    | OnKeyDown Int Bool Int Int
+    | OnKeyUp Int Bool Int Int
     | MouseDown Int
     | MouseUp Int
     | MouseOver Int
@@ -43,6 +44,7 @@ type Msg
     | Scrolled Float Float
     | DebounceMsg Debounce.Msg
     | TriggerHighlight
+    | GetPredictionCharViewport (Result Dom.Error Dom.Element)
     | NoOp
 
 
@@ -53,6 +55,7 @@ type HighlightId
 initialHighlightId : HighlightId
 initialHighlightId =
     HighlightId 0
+
 
 
 type alias ModelData s =
@@ -67,6 +70,7 @@ type alias ModelData s =
     , highlightId : HighlightId
     , debounce : Debounce.Debounce HighlightId
     , debounceMs : Float
+    , predictions: Predictions
     }
 
 
