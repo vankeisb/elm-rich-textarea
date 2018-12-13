@@ -57,7 +57,6 @@ type alias ModelData msg s =
     , debounce : Debounce.Debounce String
     , lift : Msg s -> msg
     , resolveStyles : StyleResolver msg s
-    , onHighlight : ReturnStyles msg s -> String -> Cmd msg
     }
 
 

@@ -34,7 +34,6 @@ init idPrefix =
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 , lift = TextareaMsg
                 , resolveStyles = resolveStyles
-                , onHighlight = onHighlight
                 }
     in
     ( { textareaModel = m
@@ -125,7 +124,7 @@ update msg model =
         TextareaMsg sub ->
             let
                 ( tm, c ) =
-                    Textarea.update sub model.textareaModel
+                    Textarea.update onHighlight sub model.textareaModel
             in
             ( { model
                 | textareaModel =

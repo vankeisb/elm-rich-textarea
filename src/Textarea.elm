@@ -46,8 +46,11 @@ type alias InitData msg s =
     , idPrefix : String
     , lift : Msg s -> msg
     , resolveStyles : StyleResolver msg s
-    , onHighlight : ReturnStyles msg s -> String -> Cmd msg
     }
+
+
+type alias OnHighlight msg s =
+    ReturnStyles msg s -> String -> Cmd msg
 
 
 init : InitData msg s -> ( Model msg s, Cmd msg )
@@ -73,7 +76,6 @@ init initData =
             , debounce = Debounce.init
             , lift = initData.lift
             , resolveStyles = initData.resolveStyles
-            , onHighlight = initData.onHighlight
             }
     in
     ( Model initialModelData
@@ -371,8 +373,8 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Msg s -> Model msg s -> ( Model msg s, Cmd msg )
-update msg (Model model) =
+update : OnHighlight msg s -> Msg s -> Model msg s -> ( Model msg s, Cmd msg )
+update onHighlight msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
@@ -713,7 +715,7 @@ update msg (Model model) =
                             |> Task.perform (NewHighlight model1.highlightId)
                             |> Cmd.map model1.lift
             in
-            ( Model model1, model1.onHighlight return text )
+            ( Model model1, onHighlight return text )
 
         NewHighlight highlightId styles ->
             if model.highlightId == highlightId then

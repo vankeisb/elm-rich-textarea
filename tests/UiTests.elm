@@ -132,7 +132,7 @@ suite =
 
 update : IT.Msg MyStyle -> Model Msg MyStyle -> Model Msg MyStyle
 update msg model =
-    Textarea.update msg model
+    Textarea.update asyncEmptyHighlighter msg model
         |> Tuple.first
 
 
@@ -172,7 +172,6 @@ createModel hl str =
         , initialText = str
         , lift = TextareaMsg
         , resolveStyles = resolveStyles
-        , onHighlight = asyncEmptyHighlighter
         }
         |> Tuple.first
 
