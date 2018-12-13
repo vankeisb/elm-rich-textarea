@@ -348,12 +348,13 @@ viewPredictions d =
 
         Loading e ->
             div
-                [ style "opacity" "1"
+                [ style "background-color" "whitesmoke"
+                , style "opacity" "1"
                 , style "padding" "4px"
                 , style "border" "1px solid lightgrey"
                 , style "position" "absolute"
-                , style "left" <| String.fromInt (Debug.log "x" (round (e.element.x - d.viewportBox.x))) ++ "px"
-                , style "top" <| String.fromInt (Debug.log "y" (round (e.element.y - d.viewportBox.y + e.element.height))) ++ "px"
+                , style "left" <| String.fromInt (round (e.element.x - d.viewportBox.x)) ++ "px"
+                , style "top" <| String.fromInt (round (e.element.y - d.viewportBox.y + e.element.height)) ++ "px"
                 ]
                 [ text "Loading..."]
 
