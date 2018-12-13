@@ -3,6 +3,7 @@ module Textarea exposing
     , InitData
     , Model
     , Msg
+    , OnHighlight
     , ReturnStyles
     , attributedRenderer
     , init

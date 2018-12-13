@@ -1,4 +1,14 @@
-port module Main exposing (Model, Msg(..), MyStyle(..), highlighter, init, main, resolveStyles, subscriptions, update, view)
+port module Main exposing
+    ( Model
+    , Msg(..)
+    , MyStyle(..)
+    , init
+    , main
+    , resolveStyles
+    , subscriptions
+    , update
+    , view
+    )
 
 import Browser
 import Html exposing (..)
@@ -16,7 +26,7 @@ import Textarea
 type Msg
     = TextareaMsg (Textarea.Msg MyStyle)
     | TextClicked
-    | DelayHighlight (Textarea.ReturnStyles Msg MyStyle) (List ( Range, MyStyle ))
+    | OnHighlight (Textarea.ReturnStyles Msg MyStyle) String
     | UpdateHighlight (List ( Range, MyStyle ))
 
 
@@ -37,17 +47,15 @@ init idPrefix =
         ( m, c ) =
             Textarea.init
                 { idPrefix = "my-ta"
-                , highlighter = highlighter
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 , lift = TextareaMsg
                 , resolveStyles = resolveStyles
-                , onHighlight = onHighlight
                 }
     in
     ( { textareaModel = m
       , returnHighlight = Nothing
       }
-    , Cmd.map TextareaMsg c
+    , c
     )
 
 
@@ -90,50 +98,13 @@ resolveStyles myStyles =
             []
 
 
-highlighter : String -> List ( Range, MyStyle )
-highlighter text =
-    let
-        stylify style word =
-            String.indexes word text
-                |> List.map
-                    (\i ->
-                        ( Range.range i (i + String.length word)
-                        , style
-                        )
-                    )
-
-        stylifyMany style words =
-            words
-                |> List.map (stylify style)
-                |> List.concat
-
-        keywords =
-            stylifyMany Keyword
-                [ "if"
-                , "then"
-                , "else"
-                , "let"
-                , "in"
-                , "module"
-                ]
-
-        identifiers =
-            stylifyMany Identifier
-                [ "foo"
-                , "bar"
-                ]
-    in
-    --    []
-    keywords ++ identifiers
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         TextareaMsg sub ->
             let
                 ( tm, c ) =
-                    Textarea.update sub model.textareaModel
+                    Textarea.update onHighlight sub model.textareaModel
             in
             ( { model
                 | textareaModel =
@@ -145,10 +116,12 @@ update msg model =
         TextClicked ->
             ( model, Cmd.none )
 
-        DelayHighlight return list ->
+        OnHighlight return text ->
             if model.returnHighlight == Nothing then
                 ( { model | returnHighlight = Just return }
-                , delayHighlight list
+                , text
+                    |> E.string
+                    |> requestHighlight
                 )
 
             else
@@ -168,7 +141,7 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ delayed (UpdateHighlight << decodeHighlight)
+        [ responseHighlight (UpdateHighlight << decodeHighlight)
         , Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
         ]
 
@@ -184,23 +157,15 @@ main =
         }
 
 
-onHighlight : Textarea.ReturnStyles Msg MyStyle -> String -> Cmd Msg
+onHighlight : Textarea.OnHighlight Msg MyStyle
 onHighlight return text =
-    Task.succeed (highlighter text)
-        |> Task.perform (DelayHighlight return)
+    Task.perform (OnHighlight return) <| Task.succeed text
 
 
-delayHighlight : List ( Range, MyStyle ) -> Cmd Msg
-delayHighlight list =
-    list
-        |> encodeHighlight
-        |> delay
+port requestHighlight : E.Value -> Cmd msg
 
 
-port delay : E.Value -> Cmd msg
-
-
-port delayed : (E.Value -> msg) -> Sub msg
+port responseHighlight : (E.Value -> msg) -> Sub msg
 
 
 decodeHighlight : E.Value -> List ( Range, MyStyle )
@@ -208,18 +173,6 @@ decodeHighlight value =
     value
         |> D.decodeValue highlightDecoder
         |> Result.withDefault []
-
-
-encodeHighlight : List ( Range, MyStyle ) -> E.Value
-encodeHighlight list =
-    list
-        |> E.list
-            (\( range, mystyle ) ->
-                E.object
-                    [ ( "range", encodeRange range )
-                    , ( "mystyle", encodeMyStyle mystyle )
-                    ]
-            )
 
 
 highlightDecoder : D.Decoder (List ( Range, MyStyle ))
@@ -233,16 +186,6 @@ highlightDecoder =
 rangeDecoder : D.Decoder Range
 rangeDecoder =
     D.map2 Range.range (D.index 0 D.int) (D.index 1 D.int)
-
-
-encodeRange : Range -> E.Value
-encodeRange range =
-    E.list E.int <| tupleAsList <| Range.getBounds range
-
-
-tupleAsList : ( a, a ) -> List a
-tupleAsList ( a, b ) =
-    [ a, b ]
 
 
 myStyleDecoder : D.Decoder MyStyle
@@ -261,13 +204,3 @@ fromString style =
 
         _ ->
             Identifier
-
-
-encodeMyStyle : MyStyle -> E.Value
-encodeMyStyle style =
-    case style of
-        Keyword ->
-            E.string "Keyword"
-
-        Identifier ->
-            E.string "Identifier"
