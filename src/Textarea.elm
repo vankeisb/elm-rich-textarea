@@ -42,8 +42,7 @@ type alias ReturnStyles msg s =
 
 
 type alias InitData msg s =
-    { highlighter : Highlighter s
-    , initialText : String
+    { initialText : String
     , idPrefix : String
     , lift : Msg s -> msg
     , resolveStyles : StyleResolver msg s
@@ -51,7 +50,7 @@ type alias InitData msg s =
     }
 
 
-init : InitData msg s -> ( Model msg s, Cmd (Msg s) )
+init : InitData msg s -> ( Model msg s, Cmd msg )
 init initData =
     let
         initialModelData =
@@ -78,10 +77,10 @@ init initData =
             }
     in
     ( Model initialModelData
-        |> computeStyles initData.highlighter
     , Cmd.none
     )
         |> getViewportPos
+        |> computeStylesAsync
 
 
 focusTextarea : ModelData msg s -> Cmd (Msg s)

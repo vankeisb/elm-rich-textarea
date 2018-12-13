@@ -169,7 +169,6 @@ createModel : Highlighter MyStyle -> String -> Model Msg MyStyle
 createModel hl str =
     Textarea.init
         { idPrefix = "test-ta"
-        , highlighter = hl
         , initialText = str
         , lift = TextareaMsg
         , resolveStyles = resolveStyles
