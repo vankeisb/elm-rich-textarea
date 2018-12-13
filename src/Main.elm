@@ -31,7 +31,6 @@ init idPrefix =
         ( m, c ) =
             Textarea.init
                 { idPrefix = "my-ta"
-                , highlighter = highlighter
                 , initialText = "let\n  foo = 1\nin\n  foo + bar"
                 , lift = TextareaMsg
                 , resolveStyles = resolveStyles
@@ -40,7 +39,7 @@ init idPrefix =
     in
     ( { textareaModel = m
       }
-    , Cmd.map TextareaMsg c
+    , c
     )
 
 
