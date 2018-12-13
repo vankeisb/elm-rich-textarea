@@ -10,6 +10,11 @@ module Textarea exposing
     , defaultInitData
     , encodeHighlightRequest
     , highlightResponseDecoder
+    , encodePredictionRequest
+    , predictResponseDecoder
+    , PredictionRequest
+    , PredictResponse
+    , applyPredictions
     , init
     , subscriptions
     , update
@@ -64,10 +69,21 @@ type alias HighlightRequest =
     }
 
 
+type alias PredictionId =
+    Internal.Textarea.HighlightId
+
+
+type alias PredictionRequest =
+    { text: String
+    , offset: Int
+    }
+
+
 {-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
 -}
 type OutMsg
     = RequestHighlight HighlightRequest
+    | RequestPrediction PredictionRequest
 
 
 {-| Init dat afor the textarea
@@ -131,7 +147,7 @@ init initData =
         |> getViewportPos
 
 
-requestHighlight : ( Model m, Cmd Msg ) -> ( Model m, Cmd Msg, Maybe OutMsg )
+requestHighlight : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
 requestHighlight ( Model model, cmd ) =
     let
         ( debounce, debounceCmd ) =
@@ -147,6 +163,7 @@ requestHighlight ( Model model, cmd ) =
         ]
     )
         |> noOut
+
 
 
 withOutMsg : Maybe OutMsg -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
@@ -186,7 +203,6 @@ type alias Highlighter s m =
     List s -> List (Html.Attribute m)
 
 
-
 -- used to display the textarea
 
 
@@ -196,7 +212,7 @@ devMode =
 
 {-| Render the rich textarea widget.
 -}
-view : (Msg -> m) -> Highlighter s m -> Model s -> Html m
+view : (Msg -> m) -> Highlighter s m ->  Model s -> Html m
 view lift highlighter (Model d) =
     let
         lines =
@@ -270,7 +286,7 @@ view lift highlighter (Model d) =
                     }
         """
             ]
-        , Html.map lift <| viewPredictions d
+        , viewPredictions lift d
         , Html.map lift <|
             textarea
                 [ value d.text
@@ -340,13 +356,10 @@ view lift highlighter (Model d) =
         ]
 
 
-viewPredictions: ModelData s -> Html Msg
-viewPredictions d =
-    case d.predictions of
-        Closed ->
-            text ""
-
-        Loading e ->
+viewPredictions: (Msg -> m) -> ModelData s -> Html m
+viewPredictions lift d =
+    let
+        wrap e h =
             div
                 [ style "background-color" "whitesmoke"
                 , style "opacity" "1"
@@ -356,7 +369,29 @@ viewPredictions d =
                 , style "left" <| String.fromInt (round (e.element.x - d.viewportBox.x)) ++ "px"
                 , style "top" <| String.fromInt (round (e.element.y - d.viewportBox.y + e.element.height)) ++ "px"
                 ]
-                [ text "Loading..."]
+                [ h ]
+
+    in
+    case d.predictions of
+        Closed ->
+            text ""
+
+        Loading e ->
+            wrap e <|
+                text "Loading..."
+
+        Open e preds ->
+            wrap e <|
+                div
+                    []
+                    ( preds
+                        |> List.map
+                            (\pred ->
+                                div
+                                    []
+                                    [ text pred ]
+                            )
+                    )
 
 
 renderStyledText : ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
@@ -651,6 +686,8 @@ update msg (Model model) =
             Model
                 { model
                     | focused = False
+                    , predictions =
+                        Closed
                 }
                 |> setSelectingAt Nothing
                 |> noCmd
@@ -849,13 +886,21 @@ update msg (Model model) =
         GetPredictionCharViewport (Ok element) ->
             -- we've got the position, let's show the
             -- prediction view
-            Model
+            ( Model
                 { model
                     | predictions =
                         Loading element
                 }
-                |> noCmd
-                |> noOut
+            , Cmd.none
+            , model.selection
+                |> Maybe.map
+                    (\sel ->
+                        RequestPrediction
+                            { text = model.text
+                            , offset = Range.getFrom sel
+                            }
+                    )
+            )
 
         GetPredictionCharViewport (Err _) ->
             -- TODO
@@ -934,15 +979,17 @@ onKey isDown keyCode ctrlKey start end d =
                         )
                     |> Maybe.withDefault
                         ( d.text, d.selection )
-
             else
                 ( d.text
                 , Just <| Range.range start end
                 )
 
+        isPredictionTrigger =
+            keyCode == 32 && ctrlKey && isDown
+
         -- trigger prediction if needed
         predictionCmd =
-            if keyCode == 32 && ctrlKey then
+            if isPredictionTrigger then
                 Dom.getElement
                     (charId d start)
                     |> Task.attempt GetPredictionCharViewport
@@ -952,6 +999,12 @@ onKey isDown keyCode ctrlKey start end d =
     ( Model
         { d
             | text = newText
+            , predictions =
+                -- close predictions on ESC
+                if keyCode == 27 then
+                    Closed
+                else
+                    d.predictions
         }
         |> computeStyledTexts
     , predictionCmd
@@ -1159,3 +1212,40 @@ rangeDecoder =
     Json.map2 Range.range
         (Json.field "from" Json.int)
         (Json.field "to" Json.int)
+
+
+
+type alias PredictResponse =
+    { predictions: List Prediction
+    }
+
+
+encodePredictionRequest : PredictionRequest -> Encode.Value
+encodePredictionRequest r =
+    Encode.object
+        [ ( "text", Encode.string r.text )
+        , ( "offset", Encode.int r.offset)
+        ]
+
+
+predictResponseDecoder: Json.Decoder PredictResponse
+predictResponseDecoder =
+    Json.map PredictResponse
+        (Json.field "predictions" <| Json.list Json.string)
+
+
+
+applyPredictions: List Prediction -> Model s -> (Model s, Cmd Msg)
+applyPredictions preds (Model d) =
+    case Debug.log "applyPredictions" d.predictions of
+        Loading e ->
+            ( Model
+                { d
+                    | predictions =
+                        Open e preds
+                }
+            , Cmd.none
+            )
+
+        _ ->
+            (Model d, Cmd.none)

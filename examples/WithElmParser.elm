@@ -87,6 +87,7 @@ renderer myStyles =
             []
 
 
+
 highlight : String -> List ( Range, MyStyle )
 highlight text =
     let
@@ -139,6 +140,9 @@ update msg model =
                                 hr.id
                                 (highlight hr.text)
                                 tm
+
+                        Just (Textarea.RequestPrediction pr) ->
+                            Debug.log "request prediction!!" tm
 
                         Nothing ->
                             tm

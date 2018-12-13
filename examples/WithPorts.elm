@@ -19,6 +19,7 @@ type Msg
     = TextareaMsg Textarea.Msg
     | TextClicked
     | OnParseResult D.Value
+    | OnPredictResult D.Value
 
 
 {-
@@ -34,6 +35,7 @@ type MyStyle
 -}
 type alias Model =
     { textareaModel : Textarea.Model MyStyle
+    , blah: String
     }
 
 
@@ -47,6 +49,7 @@ init idPrefix =
                     "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m
+        , blah = ""
       }
     , Cmd.map TextareaMsg c
     )
@@ -101,6 +104,9 @@ update msg model =
                         Just (Textarea.RequestHighlight hr) ->
                             highlight <| Textarea.encodeHighlightRequest hr
 
+                        Just (Textarea.RequestPrediction pr) ->
+                            predict <| Textarea.encodePredictionRequest pr
+
                         Nothing ->
                             Cmd.none
             in
@@ -142,6 +148,37 @@ update msg model =
                     (model, Cmd.none)
 
 
+        OnPredictResult v ->
+            let
+                pr =
+                    D.decodeValue
+                        Textarea.predictResponseDecoder
+                        v
+            in
+            case Debug.log "pr" pr of
+                Ok predictResponse ->
+                    let
+                        (tm, tc) =
+                            Textarea.applyPredictions
+                                predictResponse.predictions
+                                model.textareaModel
+                    in
+                    (
+                        { model
+                            | textareaModel =
+                                tm
+                        }
+                    , Cmd.map TextareaMsg tc
+                    )
+
+                Err e ->
+                    let
+                        x =
+                            Debug.log "failed to decode prediction response" (Debug.toString e)
+                    in
+                    (model, Cmd.none)
+
+
         TextClicked ->
             ( model, Cmd.none )
 
@@ -154,6 +191,12 @@ port highlight: E.Value -> Cmd m
 
 
 port onHighlightResponse: (D.Value -> m) -> Sub m
+
+
+port predict: E.Value -> Cmd m
+
+
+port onPredictResponse: (D.Value -> m) -> Sub m
 
 
 myStyleDecoder: D.Decoder MyStyle
@@ -172,7 +215,6 @@ myStyleDecoder =
                         D.fail <| "Unknown style " ++ unknownStyle
             )
 
-
 {-
     Subs
 -}
@@ -182,5 +224,6 @@ subscriptions model =
     Sub.batch
         [ Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
         , onHighlightResponse OnParseResult
+        , onPredictResponse OnPredictResult
         ]
 

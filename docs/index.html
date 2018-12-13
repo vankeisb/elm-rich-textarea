@@ -38,6 +38,8 @@
         return words.map(k => highlightWord(0, str, k, style)).flat();
     }
 
+
+
     function highlightWord(index, str, word, style) {
         const i = str.indexOf(word);
         if (i === -1) {
