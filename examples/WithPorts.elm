@@ -93,25 +93,14 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                ( tm, c, o ) =
+                ( tm, c ) =
                     Textarea.update sub model.textareaModel
-
-                parseCmd =
-                    case o of
-                        Just (Textarea.RequestHighlight hr) ->
-                            highlight <| Textarea.encodeHighlightRequest hr
-
-                        Nothing ->
-                            Cmd.none
             in
             ( { model
                 | textareaModel =
                     tm
               }
-            , Cmd.batch
-                [ Cmd.map TextareaMsg c
-                , parseCmd
-                ]
+            , Cmd.map TextareaMsg c
             )
 
         OnParseResult v ->

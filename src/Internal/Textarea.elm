@@ -19,7 +19,7 @@ import Json.Encode as Encode
 import Range exposing (Range)
 
 
-type Msg
+type Msg s
     = OnInput String Int Int
     | OnKeyDown Int Int Int
     | OnKeyUp Int Int Int
@@ -43,6 +43,7 @@ type Msg
     | Scrolled Float Float
     | DebounceMsg Debounce.Msg
     | TriggerHighlight
+    | OnHighlight (List (Range, s))
     | NoOp
 
 

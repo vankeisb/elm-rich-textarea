@@ -129,23 +129,12 @@ update msg model =
     case msg of
         TextareaMsg sub ->
             let
-                ( tm, c, o ) =
+                ( tm, c ) =
                     Textarea.update sub model.textareaModel
-
-                tm2 =
-                    case o of
-                        Just (Textarea.RequestHighlight hr) ->
-                            Textarea.applyStyles
-                                hr.id
-                                (highlight hr.text)
-                                tm
-
-                        Nothing ->
-                            tm
             in
             ( { model
                 | textareaModel =
-                    tm2
+                    tm
               }
             , Cmd.map TextareaMsg c
             )
