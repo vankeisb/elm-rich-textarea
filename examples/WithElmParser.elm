@@ -28,11 +28,14 @@ type MyStyle
     | Identifier
 
 
+type alias MyPrediction = String
+
+
 {-
     Your Model should keep the textarea's Model, that's parent/child...
 -}
 type alias Model =
-    { textareaModel : Textarea.Model MyStyle
+    { textareaModel : Textarea.Model MyStyle MyPrediction
     }
 
 
@@ -62,6 +65,7 @@ view model =
         [ Textarea.view
             TextareaMsg
             renderer
+            (\p -> text <| Debug.toString p)
             model.textareaModel
         ]
 

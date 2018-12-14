@@ -1,20 +1,16 @@
-module Internal.Predictions exposing (Predictions(..), Prediction)
+module Internal.Predictions exposing (Predictions(..), PredictionsData)
 
 
 import Browser.Dom as Dom
 
 
-
-type alias Prediction = String
-
-
-type alias PredictionsData =
-    { predictions: List Prediction
+type alias PredictionsData p =
+    { predictions: List p
     }
 
 
 
-type Predictions
+type Predictions p
     = Closed
     | Loading Dom.Element
-    | Open Dom.Element PredictionsData
+    | Open Dom.Element (PredictionsData p)

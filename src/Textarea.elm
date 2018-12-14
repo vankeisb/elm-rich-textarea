@@ -15,6 +15,7 @@ module Textarea exposing
     , PredictionRequest
     , PredictResponse
     , applyPredictions
+    , PredictionRenderer
     , init
     , subscriptions
     , update
@@ -45,8 +46,8 @@ import Time exposing (Posix)
 
 {-| Model, should be stored in the parent's
 -}
-type alias Model s =
-    Internal.Textarea.Model s
+type alias Model s p =
+    Internal.Textarea.Model s p
 
 
 {-| Msgs should be relayed by the parent
@@ -77,6 +78,9 @@ type alias PredictionRequest =
     { text: String
     , offset: Int
     }
+
+
+type alias PredictionRenderer p m = p -> Html m
 
 
 {-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
@@ -114,7 +118,7 @@ defaultInitData idPrefix initialText =
 
 {-| initialize everything, and triggers the initial highlight request.
 -}
-init : InitData -> ( Model s, Cmd Msg )
+init : InitData -> ( Model s p, Cmd Msg )
 init initData =
     let
         initialModelData =
@@ -147,7 +151,7 @@ init initData =
         |> getViewportPos
 
 
-requestHighlight : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+requestHighlight : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 requestHighlight ( Model model, cmd ) =
     let
         ( debounce, debounceCmd ) =
@@ -166,33 +170,33 @@ requestHighlight ( Model model, cmd ) =
 
 
 
-withOutMsg : Maybe OutMsg -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+withOutMsg : Maybe OutMsg -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 withOutMsg outMsg ( model, cmd ) =
     ( model, cmd, outMsg )
 
 
-noOut : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+noOut : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 noOut =
     withOutMsg Nothing
 
 
-focusTextarea : ModelData s -> Cmd Msg
+focusTextarea : ModelData s p -> Cmd Msg
 focusTextarea d =
     Dom.focus (textareaId d)
         |> Task.attempt Focused
 
 
-textareaId : ModelData s -> String
+textareaId : ModelData s p -> String
 textareaId d =
     d.idPrefix ++ "-textarea"
 
 
-viewportId : ModelData s -> String
+viewportId : ModelData s p -> String
 viewportId d =
     d.idPrefix ++ "-viewport"
 
 
-charId : ModelData s -> Int -> String
+charId : ModelData s p -> Int -> String
 charId d i =
     d.idPrefix ++ "-char-" ++ String.fromInt i
 
@@ -212,8 +216,8 @@ devMode =
 
 {-| Render the rich textarea widget.
 -}
-view : (Msg -> m) -> Highlighter s m ->  Model s -> Html m
-view lift highlighter (Model d) =
+view : (Msg -> m) -> Highlighter s m -> PredictionRenderer p m -> Model s p -> Html m
+view lift highlighter predRenderer (Model d) =
     let
         lines =
             d.styledTexts
@@ -286,7 +290,7 @@ view lift highlighter (Model d) =
                     }
         """
             ]
-        , viewPredictions lift d
+        , viewPredictions lift predRenderer d
         , Html.map lift <|
             textarea
                 [ value d.text
@@ -356,8 +360,8 @@ view lift highlighter (Model d) =
         ]
 
 
-viewPredictions: (Msg -> m) -> ModelData s -> Html m
-viewPredictions lift d =
+viewPredictions: (Msg -> m) -> PredictionRenderer p m -> ModelData s p -> Html m
+viewPredictions lift renderer d =
     let
         wrap e h =
             div
@@ -389,12 +393,12 @@ viewPredictions lift d =
                             (\pred ->
                                 div
                                     []
-                                    [ text pred ]
+                                    [ renderer pred ]
                             )
                     )
 
 
-renderStyledText : ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
+renderStyledText : ModelData s p -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
 renderStyledText m lift highlighter st =
     let
         dataFrom f =
@@ -475,7 +479,7 @@ renderStyledText m lift highlighter st =
         )
 
 
-computeStyledTexts : Model s -> Model s
+computeStyledTexts : Model s p -> Model s p
 computeStyledTexts (Model d) =
     Model
         { d
@@ -505,7 +509,7 @@ noCmd m =
     ( m, Cmd.none )
 
 
-setSelection : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+setSelection : Maybe Range -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 setSelection r ( Model d, c ) =
     ( Model
         { d
@@ -517,7 +521,7 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+updateIfSelecting : (Model s p -> Model s p) -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 updateIfSelecting fun ( Model model, c ) =
     if model.selectingAt /= Nothing then
         ( Model model, c )
@@ -528,7 +532,7 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Msg -> Model s -> ( Model s, Cmd Msg, Maybe OutMsg )
+update : Msg -> Model s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
 update msg (Model model) =
     case msg of
         OnInput s start end ->
@@ -913,7 +917,7 @@ triggerHighlightNow =
         |> Task.perform (\_ -> TriggerHighlight)
 
 
-setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
+setCaretPos : Int -> Model s p -> ( Model s p, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
         |> setSelectingAt (Just i)
@@ -921,17 +925,17 @@ setCaretPos i (Model d) =
     )
 
 
-setSelectingAt : Maybe Int -> Model s -> Model s
+setSelectingAt : Maybe Int -> Model s p -> Model s p
 setSelectingAt at (Model d) =
     Model { d | selectingAt = at }
 
 
-expandSelection : Int -> Model s -> Model s
+expandSelection : Int -> Model s p -> Model s p
 expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
-expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s -> Model s
+expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s p -> Model s p
 expanSelectionWith fun pos (Model d) =
     let
         selection =
@@ -944,17 +948,17 @@ expanSelectionWith fun pos (Model d) =
         }
 
 
-expandWordSelection : Int -> Model s -> Model s
+expandWordSelection : Int -> Model s p -> Model s p
 expandWordSelection =
     expanSelectionWith wordRangeAt
 
 
-expandLineSelection : Int -> Model s -> Model s
+expandLineSelection : Int -> Model s p -> Model s p
 expandLineSelection =
     expanSelectionWith lineRangeAt
 
 
-onKey : Bool -> Int -> Bool -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
+onKey : Bool -> Int -> Bool -> Int -> Int -> ModelData s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
 onKey isDown keyCode ctrlKey start end d =
     let
         ( newText, newSel ) =
@@ -1014,7 +1018,7 @@ onKey isDown keyCode ctrlKey start end d =
         |> requestHighlight
 
 
-getViewportPos : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportPos : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -1025,7 +1029,7 @@ getViewportPos ( Model d, c ) =
     )
 
 
-getViewportSize : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportSize : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 getViewportSize ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -1036,7 +1040,7 @@ getViewportSize ( Model d, c ) =
     )
 
 
-scrollCaretIntoView : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+scrollCaretIntoView : Maybe Range -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 scrollCaretIntoView prevRange ( Model d, c ) =
     let
         scrollCmd charIndex =
@@ -1091,7 +1095,7 @@ scrollCaretIntoView prevRange ( Model d, c ) =
     )
 
 
-subscriptions : Model s -> Sub Msg
+subscriptions : Model s p -> Sub Msg
 subscriptions (Model model) =
     Sub.none
 
@@ -1153,7 +1157,7 @@ adjustIndex offsetX clientWidth =
         0
 
 
-applyStyles : HighlightId -> List ( Range, s ) -> Model s -> Model s
+applyStyles : HighlightId -> List ( Range, s ) -> Model s p -> Model s p
 applyStyles highlightId styles (Model model) =
     if model.highlightId == highlightId then
         Model
@@ -1215,8 +1219,8 @@ rangeDecoder =
 
 
 
-type alias PredictResponse =
-    { predictions: List Prediction
+type alias PredictResponse p =
+    { predictions: List p
     }
 
 
@@ -1228,14 +1232,14 @@ encodePredictionRequest r =
         ]
 
 
-predictResponseDecoder: Json.Decoder PredictResponse
-predictResponseDecoder =
+predictResponseDecoder: Json.Decoder p -> Json.Decoder (PredictResponse p)
+predictResponseDecoder predictionDecoder =
     Json.map PredictResponse
-        (Json.field "predictions" <| Json.list Json.string)
+        (Json.field "predictions" <| Json.list predictionDecoder)
 
 
 
-applyPredictions: List Prediction -> Model s -> (Model s, Cmd Msg)
+applyPredictions: List p -> Model s p -> (Model s p, Cmd Msg)
 applyPredictions preds (Model d) =
     case Debug.log "applyPredictions" d.predictions of
         Loading e ->

@@ -30,11 +30,14 @@ type MyStyle
     | Identifier
 
 
+type alias MyPrediction = String
+
+
 {-
     Your Model should keep the textarea's Model, that's parent/child...
 -}
 type alias Model =
-    { textareaModel : Textarea.Model MyStyle
+    { textareaModel : Textarea.Model MyStyle MyPrediction
     , blah: String
     }
 
@@ -66,6 +69,7 @@ view model =
         [ Textarea.view
             TextareaMsg
             renderer
+            predictionRenderer
             model.textareaModel
         ]
 
@@ -89,6 +93,11 @@ renderer myStyles =
                                ]
             )
             []
+
+
+predictionRenderer: MyPrediction -> Html Msg
+predictionRenderer pred =
+    text <| pred
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -152,7 +161,7 @@ update msg model =
             let
                 pr =
                     D.decodeValue
-                        Textarea.predictResponseDecoder
+                        (Textarea.predictResponseDecoder D.string)
                         v
             in
             case Debug.log "pr" pr of

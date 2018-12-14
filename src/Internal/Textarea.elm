@@ -58,7 +58,7 @@ initialHighlightId =
 
 
 
-type alias ModelData s =
+type alias ModelData s p =
     { idPrefix : String
     , text : String
     , selection : Maybe Range
@@ -70,7 +70,7 @@ type alias ModelData s =
     , highlightId : HighlightId
     , debounce : Debounce.Debounce HighlightId
     , debounceMs : Float
-    , predictions: Predictions
+    , predictions: Predictions p
     }
 
 
@@ -84,8 +84,8 @@ type alias Box =
     }
 
 
-type Model s
-    = Model (ModelData s)
+type Model s p
+    = Model (ModelData s p)
 
 
 lineSize : Int -> String -> Maybe Int
