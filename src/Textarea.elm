@@ -380,11 +380,11 @@ viewPredictions lift d =
             wrap e <|
                 text "Loading..."
 
-        Open e preds ->
+        Open e predictionsData ->
             wrap e <|
                 div
                     []
-                    ( preds
+                    ( predictionsData.predictions
                         |> List.map
                             (\pred ->
                                 div
@@ -1242,7 +1242,9 @@ applyPredictions preds (Model d) =
             ( Model
                 { d
                     | predictions =
-                        Open e preds
+                        Open e
+                            { predictions = preds
+                            }
                 }
             , Cmd.none
             )
