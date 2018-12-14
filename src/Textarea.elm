@@ -34,7 +34,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Internal.Styles as S exposing (StyledText, Styles)
 import Internal.Textarea exposing (..)
-import Internal.Predictions exposing (..)
+import Internal.Predictions as Predictions exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Process
@@ -322,15 +322,31 @@ view lift highlighter predRenderer (Model d) =
                 , custom "keydown" <|
                     Json.map4
                         (\keyCode ctrlKey start end ->
+                            let
+                                stopEvt =
+                                    if Debug.log "kc" keyCode == 9 then
+                                        -- stop tab
+                                        True
+                                    else
+                                        case d.predictions of
+                                            Open _ _ ->
+                                                -- prediction view is open,
+                                                -- we stop propagation for
+                                                -- everything at the moment.
+                                                -- we'll need to be more subtle,
+                                                -- and only stop up/down nav keys
+                                                -- and such stuff here...
+--                                                if keyCode == 18 || keyCode == 40 then
+                                                True
+--                                                else
+--                                                    False
+                                            _ ->
+
+                                                False
+                            in
                             { message = OnKeyDown keyCode ctrlKey start end
-                            , preventDefault =
-                                keyCode == 9
-
-                            -- stop tab
-                            , stopPropagation =
-                                keyCode == 9
-
-                            -- stop tab
+                            , preventDefault = stopEvt
+                            , stopPropagation = stopEvt
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
@@ -388,11 +404,16 @@ viewPredictions lift renderer d =
             wrap e <|
                 div
                     []
-                    ( predictionsData.predictions
+                    ( Predictions.toList predictionsData
                         |> List.map
                             (\pred ->
                                 div
-                                    []
+                                    [ style "background-color" <|
+                                        if Predictions.isSelected pred predictionsData then
+                                            "lightblue"
+                                        else
+                                            ""
+                                    ]
                                     [ renderer pred ]
                             )
                     )
@@ -1004,11 +1025,7 @@ onKey isDown keyCode ctrlKey start end d =
         { d
             | text = newText
             , predictions =
-                -- close predictions on ESC
-                if keyCode == 27 then
-                    Closed
-                else
-                    d.predictions
+                handlePredictionsNav isDown keyCode d.predictions
         }
         |> computeStyledTexts
     , predictionCmd
@@ -1016,6 +1033,34 @@ onKey isDown keyCode ctrlKey start end d =
         |> getViewportPos
         |> setSelection newSel
         |> requestHighlight
+
+
+handlePredictionsNav isDown keyCode predictions =
+    if isDown then
+        case predictions of
+            Open e pd ->
+                if keyCode == 38 then
+                    -- UP
+                    Open e <| Predictions.moveUp pd
+
+                else if keyCode == 40 then
+                    -- down
+                    Open e <| Predictions.moveDown pd
+
+                else
+                    Closed
+
+            Loading _ ->
+                if keyCode == 27 then
+                    -- close predictions on ESC
+                    Closed
+                else
+                    predictions
+
+            Closed ->
+                predictions
+    else
+        predictions
 
 
 getViewportPos : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
@@ -1246,9 +1291,7 @@ applyPredictions preds (Model d) =
             ( Model
                 { d
                     | predictions =
-                        Open e
-                            { predictions = preds
-                            }
+                        Open e (Predictions.fromList preds)
                 }
             , Cmd.none
             )
