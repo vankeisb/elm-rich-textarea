@@ -70,17 +70,10 @@ type alias HighlightRequest =
     }
 
 
-type alias PredictionId =
-    Internal.Textarea.HighlightId
-
-
 type alias PredictionRequest =
     { text: String
     , offset: Int
     }
-
-
-type alias PredictionRenderer p m = p -> Html m
 
 
 {-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
@@ -207,6 +200,8 @@ type alias Highlighter s m =
     List s -> List (Html.Attribute m)
 
 
+type alias PredictionRenderer p m = p -> Html m
+
 -- used to display the textarea
 
 
@@ -297,18 +292,8 @@ view lift highlighter predRenderer (Model d) =
                 , id <| textareaId d
                 , style "position" "fixed"
                 , style "padding" "0"
-                , style "left" <|
-                    if devMode then
-                        "350px"
-
-                    else
-                        "-10000px"
-                , style "top" <|
-                    if devMode then
-                        "65px"
-
-                    else
-                        "-10000px"
+                , style "left" "-10000px"
+                , style "top" "-10000px"
                 , style "width" "200px"
                 , style "height" "100px"
                 , property "selectionStart" <| Encode.int ss
