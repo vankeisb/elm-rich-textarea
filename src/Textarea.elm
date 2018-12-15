@@ -202,11 +202,6 @@ type alias Highlighter s m =
 
 type alias PredictionRenderer p m = p -> Html m
 
--- used to display the textarea
-
-
-devMode =
-    False
 
 
 {-| Render the rich textarea widget.
