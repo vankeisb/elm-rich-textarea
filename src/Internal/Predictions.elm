@@ -44,6 +44,29 @@ fromList caretPos ps =
         , initialCaretPos = caretPos
         , allItems = ps
         }
+        |> selectFirst
+
+
+selectFirst: PredictionsData p -> PredictionsData p
+selectFirst (PredictionsData d) =
+    case d.start of
+         p :: ps ->
+            PredictionsData
+                { d
+                    | start = []
+                    , selected = Just p
+                    , end =
+                        ps ++
+                            ( d.selected
+                                |> Maybe.map (\pred -> [ pred ] )
+                                |> Maybe.withDefault []
+                            ) ++
+                            d.end
+                }
+
+         [] ->
+             PredictionsData d
+
 
 
 isSelected: p -> PredictionsData p -> Bool
@@ -111,22 +134,55 @@ moveDown (PredictionsData d) =
                     d
 
 
-applyFilter: String -> PredictionsData p -> PredictionsData p
-applyFilter s (PredictionsData pd) =
-    PredictionsData pd
---    let
---        preds =
---            pd.allItems
---
---        x =
---            Debug.log "applyFilter" s
---    in
---    PredictionsData
---        { pd
---            | start = []
---            , selected = List.head preds
---            , end =
---                List.tail preds
---                    |> Maybe.withDefault []
---        }
+applyFilter: (p -> String) -> String -> PredictionsData p -> PredictionsData p
+applyFilter predictionText filterString (PredictionsData pd) =
+    let
+        preds =
+            pd.allItems
+
+        filtered =
+            pd.allItems
+                |> List.filter
+                    (\p ->
+                        String.startsWith filterString (predictionText p)
+                    )
+                |> Debug.log "filtered"
+
+        previouslySelectedText =
+            pd.selected
+                |> Maybe.map predictionText
+
+
+        (start, sel, end) =
+            filtered
+                |> List.foldl
+                    (\pred (st,sl,ed) ->
+                        case sl of
+                            Just _ ->
+                                -- already a selected item, append to "end"
+                                (st, sl, ed ++ [ pred ])
+                            Nothing ->
+                                -- no selected item yet, check if this is the one !
+                                if previouslySelectedText == Just (predictionText pred) then
+                                    -- yep, this is the one !
+                                    (st, Just pred, [])
+                                else
+                                    -- not the one, append to "start"
+                                    (st ++ [ pred ], Nothing, [])
+                    )
+                    ([], Nothing, [])
+                |> Debug.log "foo"
+
+        newPd =
+            PredictionsData
+                { pd
+                    | start = start
+                    , selected = sel
+                    , end = end
+                }
+    in
+    if sel == Nothing then
+        selectFirst newPd
+    else
+        newPd
 

@@ -115,7 +115,7 @@ update msg model =
         TextareaMsg sub ->
             let
                 ( tm, c, o ) =
-                    Textarea.update sub model.textareaModel
+                    Textarea.update config sub model.textareaModel
 
                 parseCmd =
                     case o of

@@ -585,8 +585,8 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Msg -> Model s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
-update msg (Model model) =
+update : Config s p m -> Msg -> Model s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
+update config msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
@@ -609,10 +609,10 @@ update msg (Model model) =
                 |> requestHighlight
 
         OnKeyDown keyCode ctrlKey start end ->
-            onKey True keyCode ctrlKey start end model
+            onKey config True keyCode ctrlKey start end model
 
         OnKeyUp keyCode ctrlKey start end ->
-            onKey False keyCode ctrlKey start end model
+            onKey config False keyCode ctrlKey start end model
 
         MouseDown i ->
             setCaretPos i (Model model)
@@ -1018,8 +1018,8 @@ expandLineSelection =
     expanSelectionWith lineRangeAt
 
 
-onKey : Bool -> Int -> Bool -> Int -> Int -> ModelData s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
-onKey isDown keyCode ctrlKey start end d =
+onKey : Config s p m -> Bool -> Int -> Bool -> Int -> Int -> ModelData s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
+onKey config isDown keyCode ctrlKey start end d =
     let
         ( newText, newSel ) =
             if keyCode == 9 && not isDown then
@@ -1062,12 +1062,12 @@ onKey isDown keyCode ctrlKey start end d =
     )
         |> getViewportPos
         |> setSelection newSel
-        |> handlePredictionsNav isDown keyCode ctrlKey start end
+        |> handlePredictionsNav config isDown keyCode ctrlKey start end
         |> requestHighlight
 
 
-handlePredictionsNav: Bool -> Int -> Bool -> Int -> Int -> (Model s p, Cmd Msg) -> (Model s p, Cmd Msg)
-handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
+handlePredictionsNav: Config s p m -> Bool -> Int -> Bool -> Int -> Int -> (Model s p, Cmd Msg) -> (Model s p, Cmd Msg)
+handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
     let
         isPredictionTrigger =
             keyCode == 32 && ctrlKey && isDown
@@ -1141,44 +1141,49 @@ handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
                 -- if negative then just close preds.
                 -- if positive then get the text, and use it to
                 -- filter the predictions
-                case d.selection of
-                    Just selection ->
-                        let
-                            currentCaretPos =
-                                Range.getFrom selection
+                case config.predictionConfig of
+                    Just predictionConfig ->
+                        case d.selection of
+                            Just selection ->
+                                let
+                                    currentCaretPos =
+                                        Range.getFrom selection
 
-                            initialCaretPos =
-                                 (Predictions.getInitialCaretPos pd)
+                                    initialCaretPos =
+                                         (Predictions.getInitialCaretPos pd)
 
-                            delta =
-                                currentCaretPos - initialCaretPos
-                                    |> Debug.log "delta"
-                        in
-                        if delta < 0 then
-                            setPredictions Closed
-                                |> withCmd Cmd.none
-                        else
-                            let
-                                prefix =
-                                    getPrefixUntilSpace initialCaretPos d.text
+                                    delta =
+                                        currentCaretPos - initialCaretPos
+                                            |> Debug.log "delta"
+                                in
+                                if delta < 0 then
+                                    setPredictions Closed
+                                        |> withCmd Cmd.none
+                                else
+                                    let
+                                        prefix =
+                                            getPrefixUntilSpace initialCaretPos d.text
 
-                                str =
-                                    String.slice initialCaretPos currentCaretPos d.text
+                                        str =
+                                            String.slice initialCaretPos currentCaretPos d.text
 
-                                filter =
-                                    prefix ++ str
-                                        |> Debug.log "filter"
-                            in
-                            pd
-                                |> Predictions.applyFilter filter
-                                |> Open e
-                                |> setPredictions
-                                |> withCmd Cmd.none
+                                        filter =
+                                            prefix ++ str
+                                                |> Debug.log "filter"
+                                    in
+                                    pd
+                                        |> Predictions.applyFilter predictionConfig.text filter
+                                        |> Open e
+                                        |> setPredictions
+                                        |> withCmd Cmd.none
+
+                            Nothing ->
+                                Model d
+                                    |> withCmd Cmd.none
 
                     Nothing ->
                         Model d
                             |> withCmd Cmd.none
-
             else
                 Model d
                     |> withCmd Cmd.none
