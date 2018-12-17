@@ -100,9 +100,15 @@ highlighter myStyles =
             []
 
 
-predictionRenderer: MyPrediction -> Html Msg
+predictionRenderer: MyPrediction -> Textarea.PredictionListItem Msg
 predictionRenderer pred =
-    text <| pred
+    { text = pred
+    , icon =
+        if pred == "foo" || pred == "bar" then
+            Just <| text "λ"
+        else
+            Nothing
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

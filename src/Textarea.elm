@@ -17,6 +17,7 @@ module Textarea exposing
     , PredictResponse
     , applyPredictions
     , PredictionRenderer
+    , PredictionListItem
     , init
     , subscriptions
     , update
@@ -201,7 +202,14 @@ type alias Highlighter s m =
     List s -> List (Html.Attribute m)
 
 
-type alias PredictionRenderer p m = p -> Html m
+
+type alias PredictionListItem m =
+    { icon: Maybe (Html m)
+    , text: String
+    }
+
+
+type alias PredictionRenderer p m = p -> PredictionListItem m
 
 
 type alias Config s p m =
@@ -405,21 +413,36 @@ viewPredictions lift renderer d =
 
         Open e predictionsData ->
             wrap e <|
-                div
-                    []
-                    ( Predictions.toList predictionsData
-                        |> List.map
-                            (\pred ->
-                                div
-                                    [ style "background-color" <|
-                                        if Predictions.isSelected pred predictionsData then
-                                            "lightblue"
-                                        else
-                                            ""
-                                    ]
-                                    [ renderer pred ]
-                            )
-                    )
+                table
+                    [ style "border-spacing" "0" ]
+                    [ tbody
+                        []
+                        ( Predictions.toList predictionsData
+                            |> List.map
+                                (\pred ->
+                                    let
+                                        listItem =
+                                            renderer pred
+                                    in
+                                    tr
+                                        [ style "background-color" <|
+                                            if Predictions.isSelected pred predictionsData then
+                                                "lightblue"
+                                            else
+                                                ""
+                                        ]
+                                        [ td
+                                            []
+                                            [ listItem.icon
+                                                |> Maybe.withDefault (text "")
+                                            ]
+                                        , td
+                                            []
+                                            [ text <| listItem.text ]
+                                        ]
+                                )
+                        )
+                    ]
 
 
 renderStyledText : ModelData s p -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m

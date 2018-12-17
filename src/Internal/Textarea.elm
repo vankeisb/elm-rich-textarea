@@ -71,6 +71,7 @@ type alias ModelData s p =
     , debounce : Debounce.Debounce HighlightId
     , debounceMs : Float
     , predictions: Predictions p
+
     }
 
 
