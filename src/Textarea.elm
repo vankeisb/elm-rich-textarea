@@ -60,7 +60,7 @@ type alias Msg =
 {-| Opaque type for highlight ID.
 -}
 type alias HighlightId =
-    Internal.Textarea.HighlightId
+    Internal.Textarea.Uuid
 
 
 {-| Highlight request indicates that the editor need to highlight the text
@@ -69,6 +69,10 @@ type alias HighlightRequest =
     { id : HighlightId
     , text : String
     }
+
+
+type alias PredictionId =
+    Internal.Textarea.Uuid
 
 
 type alias PredictionRequest =
@@ -131,14 +135,14 @@ init initData =
                 , scrollLeft = 0
                 }
             , selectingAt = Nothing
-            , highlightId = initialHighlightId
+            , highlightId = initialUuid
             , debounce = Debounce.init
             , debounceMs = initData.debounceMs
             , predictions = Closed
             }
     in
     ( Model initialModelData
-        |> applyStyles initialHighlightId []
+        |> applyStyles initialUuid []
         |> computeStyledTexts
     , triggerHighlightNow
     )
@@ -1321,7 +1325,7 @@ applyStyles highlightId styles (Model model) =
 encodeHighlightRequest : HighlightRequest -> Encode.Value
 encodeHighlightRequest r =
     Encode.object
-        [ ( "id", encodeHighlightId r.id )
+        [ ( "id", encodeUuid r.id )
         , ( "text", Encode.string r.text )
         ]
 
@@ -1345,7 +1349,7 @@ highlightResponseDecoder styleDecoder =
                 (Json.field "style" styleDecoder)
     in
     Json.map2 HighlightResponse
-        (Json.field "id" highlightIdDecoder)
+        (Json.field "id" uuidDecoder)
         (Json.field "styles" <|
             Json.list rangeAndStyleDecoder
         )

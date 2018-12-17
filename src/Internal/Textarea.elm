@@ -1,12 +1,12 @@
 module Internal.Textarea exposing
     ( Box
-    , HighlightId
+    , Uuid
     , Model(..)
     , ModelData
     , Msg(..)
-    , encodeHighlightId
-    , highlightIdDecoder
-    , initialHighlightId
+    , encodeUuid
+    , uuidDecoder
+    , initialUuid
     , lineSize
     )
 
@@ -48,13 +48,13 @@ type Msg
     | NoOp
 
 
-type HighlightId
-    = HighlightId Int
+type Uuid
+    = Uuid Int
 
 
-initialHighlightId : HighlightId
-initialHighlightId =
-    HighlightId 0
+initialUuid : Uuid
+initialUuid =
+    Uuid 0
 
 
 
@@ -67,8 +67,8 @@ type alias ModelData s p =
     , focused : Bool
     , viewportBox : Box
     , selectingAt : Maybe Int
-    , highlightId : HighlightId
-    , debounce : Debounce.Debounce HighlightId
+    , highlightId : Uuid
+    , debounce : Debounce.Debounce Uuid
     , debounceMs : Float
     , predictions: Predictions p
 
@@ -107,11 +107,11 @@ lineSize n text =
         |> Array.get n
 
 
-encodeHighlightId : HighlightId -> Encode.Value
-encodeHighlightId (HighlightId id) =
+encodeUuid : Uuid -> Encode.Value
+encodeUuid (Uuid id) =
     Encode.int id
 
 
-highlightIdDecoder : Decode.Decoder HighlightId
-highlightIdDecoder =
-    Decode.map HighlightId Decode.int
+uuidDecoder : Decode.Decoder Uuid
+uuidDecoder =
+    Decode.map Uuid Decode.int
