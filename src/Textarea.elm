@@ -323,6 +323,16 @@ view config (Model d) =
                                         True
                                     else
                                         case d.predictions of
+                                            Closed ->
+                                                if config.predictionRenderer /= Nothing then
+                                                    -- stop ctrl-space
+                                                    keyCode == 32 && ctrlKey
+                                                else
+                                                    False
+
+                                            Loading _ ->
+                                                False
+
                                             Open _ _ ->
                                                 -- prediction view is open,
                                                 -- we stop propagation for
@@ -330,13 +340,12 @@ view config (Model d) =
                                                 -- we'll need to be more subtle,
                                                 -- and only stop up/down nav keys
                                                 -- and such stuff here...
---                                                if keyCode == 18 || keyCode == 40 then
-                                                True
---                                                else
---                                                    False
-                                            _ ->
+                                                if keyCode == 18 || keyCode == 40 then
+                                                    True
+                                                else
+                                                    False
 
-                                                False
+
                             in
                             { message = OnKeyDown keyCode ctrlKey start end
                             , preventDefault = stopEvt
