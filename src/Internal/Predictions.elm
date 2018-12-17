@@ -9,6 +9,7 @@ module Internal.Predictions exposing
     , getInitialCaretPos
     , applyFilter
     , getSelected
+    , setSelected
     )
 
 
@@ -190,3 +191,40 @@ applyFilter predictionText filterString (PredictionsData pd) =
     else
         newPd
 
+
+setSelected: p -> Predictions p -> Predictions p
+setSelected p preds =
+    case preds of
+        Open e pdata ->
+            let
+                (PredictionsData pd) =
+                    pdata
+
+                (start, sel, end) =
+                    toList pdata
+                        |> List.foldl
+                            (\pred (st,sl,ed) ->
+                                case sl of
+                                    Just _ ->
+                                        -- already a selected item, append to "end"
+                                        (st, sl, ed ++ [ pred ])
+                                    Nothing ->
+                                        -- no selected item yet, check if this is the one !
+                                        if pred == p then
+                                            -- yep, this is the one !
+                                            (st, Just pred, [])
+                                        else
+                                            -- not the one, append to "start"
+                                            (st ++ [ pred ], Nothing, [])
+                            )
+                            ([], Nothing, [])
+            in
+            Open e <|
+                PredictionsData
+                    { pd
+                        | start = start
+                        , selected = sel
+                        , end = end
+                    }
+        _ ->
+            preds

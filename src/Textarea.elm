@@ -998,33 +998,36 @@ update config msg (Model model) =
 
 
         PredictionClicked index ->
-            -- TODO select prediction at first click, insert if already selected
-            let
-                x =
-                    Debug.log "ggg" (Debug.toString index)
-            in
             ( case config.predictionConfig of
                 Just predictionConfig ->
                     case model.predictions of
                         Open _ pd ->
                             let
-                                pred =
+                                clickedPred =
                                     Predictions.toList pd
                                         |> Array.fromList
                                         |> Array.get index
                             in
-                            case pred of
-                                Just selPred ->
+                            case clickedPred of
+                                Just clicked ->
                                     case model.selection of
                                         Just sel ->
-                                            insertPrediction
-                                                predictionConfig
-                                                selPred
-                                                False
-                                                pd
-                                                (Range.getFrom sel)
-                                                (Model model, Cmd.none)
-
+                                            if Predictions.getSelected pd == Just clicked then
+                                                insertPrediction
+                                                    predictionConfig
+                                                    clicked
+                                                    False
+                                                    pd
+                                                    (Range.getFrom sel)
+                                                    (Model model, Cmd.none)
+                                            else
+                                                (Model
+                                                    { model
+                                                        | predictions =
+                                                            Predictions.setSelected clicked model.predictions
+                                                    }
+                                                , Cmd.none
+                                                )
 
                                         Nothing ->
                                             Model model |> noCmd
