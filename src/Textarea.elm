@@ -348,7 +348,7 @@ view config (Model d) =
                                                 -- we'll need to be more subtle,
                                                 -- and only stop up/down nav keys
                                                 -- and such stuff here...
-                                                if keyCode == 18 || keyCode == 40 then
+                                                if keyCode == 38 || keyCode == 40 then
                                                     True
                                                 else
                                                     False
@@ -1035,58 +1035,105 @@ onKey isDown keyCode ctrlKey start end d =
                 , Just <| Range.range start end
                 )
 
-        isPredictionTrigger =
-            keyCode == 32 && ctrlKey && isDown
 
-        -- trigger prediction if needed
-        predictionCmd =
-            if isPredictionTrigger then
-                Dom.getElement
-                    (charId d start)
-                    |> Task.attempt GetPredictionCharViewport
-            else
-                Cmd.none
+
+--        newPredictions =
+--            handlePredictionsNav isDown keyCode d.predictions
     in
     ( Model
         { d
             | text = newText
-            , predictions =
-                handlePredictionsNav isDown keyCode d.predictions
         }
         |> computeStyledTexts
-    , predictionCmd
+    , Cmd.none
     )
         |> getViewportPos
         |> setSelection newSel
+        |> handlePredictionsNav isDown keyCode ctrlKey start end
         |> requestHighlight
 
 
-handlePredictionsNav isDown keyCode predictions =
-    if isDown then
-        case predictions of
-            Open e pd ->
+handlePredictionsNav: Bool -> Int -> Bool -> Int -> Int -> (Model s p, Cmd Msg) -> (Model s p, Cmd Msg)
+handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
+    let
+        isPredictionTrigger =
+            keyCode == 32 && ctrlKey && isDown
+
+        escapeKey =
+            keyCode == 27
+
+        setPredictions newPreds =
+            Model
+                { d
+                    | predictions =
+                        newPreds
+                }
+
+        withCmd c m =
+            (m, Cmd.batch [ cmd, c ])
+    in
+    case d.predictions of
+        Closed ->
+            -- trigger preds if needed
+            Model d
+                |> withCmd
+                    (
+                        if isPredictionTrigger then
+                            Dom.getElement
+                                (charId d start)
+                                |> Task.attempt GetPredictionCharViewport
+                        else
+                            Cmd.none
+                    )
+
+        Loading _ ->
+            if escapeKey then
+                -- close predictions on ESC
+                setPredictions Closed
+                    |> withCmd Cmd.none
+            else
+                Model d
+                    |> withCmd Cmd.none
+
+        Open e pd ->
+            if isDown then
                 if keyCode == 38 then
                     -- UP
-                    Open e <| Predictions.moveUp pd
+                    Predictions.moveUp pd
+                        |> Open e
+                        |> setPredictions
+                        |> withCmd Cmd.none
 
                 else if keyCode == 40 then
                     -- down
-                    Open e <| Predictions.moveDown pd
+                    Predictions.moveDown pd
+                        |> Open e
+                        |> setPredictions
+                        |> withCmd Cmd.none
 
-                else
-                    Closed
-
-            Loading _ ->
-                if keyCode == 27 then
+                else if keyCode == 27 then
                     -- close predictions on ESC
-                    Closed
-                else
-                    predictions
+                    setPredictions Closed
+                        |> withCmd Cmd.none
 
-            Closed ->
-                predictions
-    else
-        predictions
+                else if keyCode == 13 then
+                    -- ENTER : insert selected prediction if any
+                    setPredictions Closed
+                        |> withCmd Cmd.none
+
+                else
+                    -- TODO
+                    -- compare current caret pos to "initial" pos, when
+                    -- predictions have been triggered.
+                    -- if negative then just close preds.
+                    -- if positive then get the text, and use it to
+                    -- filter the predictions
+                    Model d
+                        |> withCmd Cmd.none
+            else
+                Model d
+                    |> withCmd Cmd.none
+
 
 
 getViewportPos : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
