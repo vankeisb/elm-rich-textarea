@@ -56,7 +56,7 @@ config: Textarea.Config MyStyle () Msg
 config =
     { lift = TextareaMsg
     , highlighter = renderer
-    , predictionRenderer = Nothing
+    , predictionConfig = Nothing
     }
 
 

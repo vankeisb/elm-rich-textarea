@@ -16,8 +16,7 @@ module Textarea exposing
     , PredictionRequest
     , PredictResponse
     , applyPredictions
-    , PredictionRenderer
-    , PredictionListItem
+    , PredictionConfig
     , init
     , subscriptions
     , update
@@ -203,19 +202,17 @@ type alias Highlighter s m =
 
 
 
-type alias PredictionListItem m =
-    { icon: Maybe (Html m)
-    , text: String
+
+type alias PredictionConfig p m =
+    { icon: p -> Maybe (Html m)
+    , text: p -> String
     }
-
-
-type alias PredictionRenderer p m = p -> PredictionListItem m
 
 
 type alias Config s p m =
     { lift: Msg -> m
     , highlighter: Highlighter s m
-    , predictionRenderer: Maybe (PredictionRenderer p m)
+    , predictionConfig: Maybe (PredictionConfig p m)
     }
 
 
@@ -298,9 +295,9 @@ view config (Model d) =
                     }
         """
             ]
-        , case config.predictionRenderer of
-            Just predictionRenderer ->
-                viewPredictions lift predictionRenderer d
+        , case config.predictionConfig of
+            Just predConf ->
+                viewPredictions lift predConf d
             Nothing ->
                 text ""
         , Html.map lift <|
@@ -332,7 +329,7 @@ view config (Model d) =
                                     else
                                         case d.predictions of
                                             Closed ->
-                                                if config.predictionRenderer /= Nothing then
+                                                if config.predictionConfig /= Nothing then
                                                     -- stop ctrl-space
                                                     keyCode == 32 && ctrlKey
                                                 else
@@ -387,8 +384,8 @@ view config (Model d) =
         ]
 
 
-viewPredictions: (Msg -> m) -> PredictionRenderer p m -> ModelData s p -> Html m
-viewPredictions lift renderer d =
+viewPredictions: (Msg -> m) -> PredictionConfig p m -> ModelData s p -> Html m
+viewPredictions lift predConf d =
     let
         wrap e h =
             div
@@ -420,10 +417,6 @@ viewPredictions lift renderer d =
                         ( Predictions.toList predictionsData
                             |> List.map
                                 (\pred ->
-                                    let
-                                        listItem =
-                                            renderer pred
-                                    in
                                     tr
                                         [ style "background-color" <|
                                             if Predictions.isSelected pred predictionsData then
@@ -433,12 +426,12 @@ viewPredictions lift renderer d =
                                         ]
                                         [ td
                                             []
-                                            [ listItem.icon
+                                            [ predConf.icon pred
                                                 |> Maybe.withDefault (text "")
                                             ]
                                         , td
                                             []
-                                            [ text <| listItem.text ]
+                                            [ text <| predConf.text pred ]
                                         ]
                                 )
                         )
@@ -1096,40 +1089,69 @@ handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
                     |> withCmd Cmd.none
 
         Open e pd ->
-            if isDown then
-                if keyCode == 38 then
-                    -- UP
-                    Predictions.moveUp pd
-                        |> Open e
-                        |> setPredictions
-                        |> withCmd Cmd.none
+            if keyCode == 38 && isDown then
+                -- UP
+                pd
+                    |> Predictions.moveUp
+                    |> Open e
+                    |> setPredictions
+                    |> withCmd Cmd.none
 
-                else if keyCode == 40 then
-                    -- down
-                    Predictions.moveDown pd
-                        |> Open e
-                        |> setPredictions
-                        |> withCmd Cmd.none
+            else if keyCode == 40 && isDown then
+                -- down
+                pd
+                    |> Predictions.moveDown
+                    |> Open e
+                    |> setPredictions
+                    |> withCmd Cmd.none
 
-                else if keyCode == 27 then
-                    -- close predictions on ESC
-                    setPredictions Closed
-                        |> withCmd Cmd.none
+            else if keyCode == 27 && isDown then
+                -- close predictions on ESC
+                setPredictions Closed
+                    |> withCmd Cmd.none
 
-                else if keyCode == 13 then
-                    -- ENTER : insert selected prediction if any
-                    setPredictions Closed
-                        |> withCmd Cmd.none
+            else if keyCode == 13 && isDown then
+                -- ENTER : insert selected prediction if any
+                setPredictions Closed
+                    |> withCmd Cmd.none
 
-                else
-                    -- TODO
-                    -- compare current caret pos to "initial" pos, when
-                    -- predictions have been triggered.
-                    -- if negative then just close preds.
-                    -- if positive then get the text, and use it to
-                    -- filter the predictions
-                    Model d
-                        |> withCmd Cmd.none
+            else if not isDown then
+                -- compare current caret pos to "initial" pos, when
+                -- predictions have been triggered.
+                -- if negative then just close preds.
+                -- if positive then get the text, and use it to
+                -- filter the predictions
+                case d.selection of
+                    Just selection ->
+                        let
+                            currentCaretPos =
+                                Range.getFrom selection
+
+                            initialCaretPos =
+                                 (Predictions.getInitialCaretPos pd)
+
+                            delta =
+                                currentCaretPos - initialCaretPos
+                                    |> Debug.log "delta"
+                        in
+                        if delta < 0 then
+                            setPredictions Closed
+                                |> withCmd Cmd.none
+                        else
+                            let
+                                str =
+                                    String.slice initialCaretPos currentCaretPos d.text
+                            in
+                            pd
+                                |> Predictions.applyFilter str
+                                |> Open e
+                                |> setPredictions
+                                |> withCmd Cmd.none
+
+                    Nothing ->
+                        Model d
+                            |> withCmd Cmd.none
+
             else
                 Model d
                     |> withCmd Cmd.none
@@ -1359,15 +1381,23 @@ predictResponseDecoder predictionDecoder =
 
 applyPredictions: List p -> Model s p -> (Model s p, Cmd Msg)
 applyPredictions preds (Model d) =
-    case Debug.log "applyPredictions" d.predictions of
+    ( case d.predictions of
         Loading e ->
-            ( Model
-                { d
-                    | predictions =
-                        Open e (Predictions.fromList preds)
-                }
-            , Cmd.none
-            )
+            case d.selection of
+                Just selection ->
+                    Model
+                        { d
+                            | predictions =
+                                Open e <|
+                                    Predictions.fromList
+                                        (Range.getFrom selection)
+                                        preds
+                        }
+
+                Nothing ->
+                    Model d
 
         _ ->
-            (Model d, Cmd.none)
+            Model d
+    )
+        |> noCmd

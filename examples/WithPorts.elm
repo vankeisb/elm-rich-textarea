@@ -62,7 +62,16 @@ config: Textarea.Config MyStyle MyPrediction Msg
 config =
     { lift = TextareaMsg
     , highlighter = highlighter
-    , predictionRenderer = Just predictionRenderer
+    , predictionConfig =
+        Just
+            { text = identity
+            , icon =
+                \pred ->
+                    if pred == "foo" || pred == "bar" then
+                        Just <| text "λ"
+                    else
+                        Nothing
+            }
     }
 
 
@@ -98,17 +107,6 @@ highlighter myStyles =
                                ]
             )
             []
-
-
-predictionRenderer: MyPrediction -> Textarea.PredictionListItem Msg
-predictionRenderer pred =
-    { text = pred
-    , icon =
-        if pred == "foo" || pred == "bar" then
-            Just <| text "λ"
-        else
-            Nothing
-    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

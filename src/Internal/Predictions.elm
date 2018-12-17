@@ -6,6 +6,8 @@ module Internal.Predictions exposing
     , isSelected
     , moveUp
     , moveDown
+    , getInitialCaretPos
+    , applyFilter
     )
 
 
@@ -17,6 +19,8 @@ type PredictionsData p =
         { start: List p
         , selected: Maybe p
         , end: List p
+        , initialCaretPos: Int
+        , allItems: List p
         }
 
 
@@ -29,20 +33,26 @@ toList (PredictionsData d) =
         ) ++ d.end
 
 
-fromList: List p -> PredictionsData p
-fromList ps =
+fromList: Int -> List p -> PredictionsData p
+fromList caretPos ps =
     PredictionsData
         { start = []
-        , selected = List.head ps
-        , end =
-            List.tail ps
-                |> Maybe.withDefault []
+        , selected = Nothing
+        , end = []
+        , initialCaretPos = caretPos
+        , allItems = ps
         }
+        |> applyFilter ""
 
 
 isSelected: p -> PredictionsData p -> Bool
 isSelected p (PredictionsData d) =
     d.selected == Just p
+
+
+getInitialCaretPos: PredictionsData p -> Int
+getInitialCaretPos (PredictionsData pd) =
+    pd.initialCaretPos
 
 
 
@@ -98,3 +108,23 @@ moveDown (PredictionsData d) =
                     }
                 Nothing ->
                     d
+
+
+applyFilter: String -> PredictionsData p -> PredictionsData p
+applyFilter s (PredictionsData pd) =
+    let
+        preds =
+            pd.allItems
+
+        x =
+            Debug.log "applyFilter" s
+    in
+    PredictionsData
+        { pd
+            | start = []
+            , selected = List.head preds
+            , end =
+                List.tail preds
+                    |> Maybe.withDefault []
+        }
+
