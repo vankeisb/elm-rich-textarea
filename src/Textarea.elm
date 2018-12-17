@@ -336,7 +336,7 @@ view config (Model d) =
                         (\keyCode ctrlKey start end ->
                             let
                                 stopEvt =
-                                    if Debug.log "kc" keyCode == 9 then
+                                    if keyCode == 9 then
                                         -- stop tab
                                         True
                                     else
@@ -1154,7 +1154,6 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
 
                                     delta =
                                         currentCaretPos - initialCaretPos
-                                            |> Debug.log "delta"
                                 in
                                 if delta < 0 then
                                     setPredictions Closed
@@ -1169,7 +1168,6 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
 
                                         filter =
                                             prefix ++ str
-                                                |> Debug.log "filter"
                                     in
                                     pd
                                         |> Predictions.applyFilter predictionConfig.text filter

@@ -146,7 +146,6 @@ applyFilter predictionText filterString (PredictionsData pd) =
                     (\p ->
                         String.startsWith filterString (predictionText p)
                     )
-                |> Debug.log "filtered"
 
         previouslySelectedText =
             pd.selected
@@ -171,7 +170,6 @@ applyFilter predictionText filterString (PredictionsData pd) =
                                     (st ++ [ pred ], Nothing, [])
                     )
                     ([], Nothing, [])
-                |> Debug.log "foo"
 
         newPd =
             PredictionsData
