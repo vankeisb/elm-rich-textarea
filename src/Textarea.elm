@@ -430,8 +430,8 @@ viewPredictions lift predConf d =
                         [ tbody
                             []
                             ( preds
-                                |> List.map
-                                    (\pred ->
+                                |> List.indexedMap
+                                    (\i pred ->
                                         tr
                                             [ style "background-color" <|
                                                 if Predictions.isSelected pred predictionsData then
@@ -440,12 +440,36 @@ viewPredictions lift predConf d =
                                                     ""
                                             ]
                                             [ td
-                                                []
+                                                [ custom "mousedown" <|
+                                                    Json.succeed
+                                                        { message = lift <| NoOp
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                , custom "mouseup" <|
+                                                    Json.succeed
+                                                        { message = lift <| PredictionClicked i
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                ]
                                                 [ predConf.icon pred
                                                     |> Maybe.withDefault (text "")
                                                 ]
                                             , td
-                                                []
+                                                [ custom "mousedown" <|
+                                                    Json.succeed
+                                                        { message = lift <| NoOp
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                , custom "mouseup" <|
+                                                    Json.succeed
+                                                        { message = lift <| PredictionClicked i
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                ]
                                                 [ text <| predConf.text pred ]
                                             ]
                                     )
@@ -973,6 +997,48 @@ update config msg (Model model) =
             Model model |> noCmd |> noOut
 
 
+        PredictionClicked index ->
+            -- TODO select prediction at first click, insert if already selected
+            let
+                x =
+                    Debug.log "ggg" (Debug.toString index)
+            in
+            ( case config.predictionConfig of
+                Just predictionConfig ->
+                    case model.predictions of
+                        Open _ pd ->
+                            let
+                                pred =
+                                    Predictions.toList pd
+                                        |> Array.fromList
+                                        |> Array.get index
+                            in
+                            case pred of
+                                Just selPred ->
+                                    case model.selection of
+                                        Just sel ->
+                                            insertPrediction
+                                                predictionConfig
+                                                selPred
+                                                False
+                                                pd
+                                                (Range.getFrom sel)
+                                                (Model model, Cmd.none)
+
+
+                                        Nothing ->
+                                            Model model |> noCmd
+                                Nothing ->
+                                    Model model |> noCmd
+                        _ ->
+                            Model model |> noCmd
+                Nothing ->
+                    Model model |> noCmd
+            )
+                |> noOut
+
+
+
 triggerHighlightNow : Cmd Msg
 triggerHighlightNow =
     Task.succeed ()
@@ -1133,58 +1199,18 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
 
                     else if (keyCode == 13 || keyCode == 32 || keyCode == 9) && isDown then
                         -- ENTER | SPACE : insert selected prediction if any
-                        let
-                            textToInsert =
-                                Predictions.getSelected pd
-                                    |> Maybe.map
-                                        (\pred ->
-                                            let
-                                                predText =
-                                                    predictionConfig.text pred
-
-                                                prefix =
-                                                    getPrefixUntilSpace start d.text
-
-                                                rest =
-                                                    String.slice (String.length prefix) (String.length predText) predText
-                                            in
-                                            if keyCode == 32 || keyCode == 9 then
-                                                rest ++ " "
-                                            else
-                                                rest
-                                        )
-                        in
-                        case textToInsert of
-                            Just toInsert ->
-                                let
-                                    left =
-                                        String.slice 0 start d.text
-                                            |> Debug.log "left"
-
-                                    right =
-                                        String.slice start (String.length d.text) d.text
-                                            |> Debug.log "right"
-
-                                    newCaretPos =
-                                        start + (String.length toInsert)
-                                in
-                                ( Model
-                                    { d
-                                        | text =
-                                                left ++ toInsert ++ right
-                                                    |> Debug.log "newText"
-                                        , predictions =
-                                            Closed
-                                        , selection =
-                                            Just <| Range.range newCaretPos newCaretPos
-                                    }
-                                    |> withCmd triggerHighlightNow
-                                )
+                        case Predictions.getSelected pd of
+                            Just selPred ->
+                                (Model d, cmd)
+                                    |> insertPrediction
+                                        predictionConfig
+                                        selPred
+                                        (keyCode == 32 || keyCode == 9)
+                                        pd
+                                        start
 
                             Nothing ->
-                                setPredictions Closed
-                                    |> withCmd Cmd.none
-
+                                (Model d, cmd)
 
                     else if not isDown then
                         -- compare current caret pos to "initial" pos, when
@@ -1231,6 +1257,58 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
                     else
                         Model d
                             |> withCmd Cmd.none
+
+
+
+
+insertPrediction predictionConfig pred appendSpaceAtEnd pd pos (Model d, cmd) =
+    let
+        textToInsert =
+            let
+                predText =
+                    predictionConfig.text pred
+
+                prefix =
+                    getPrefixUntilSpace pos d.text
+
+                rest =
+                    String.slice (String.length prefix) (String.length predText) predText
+            in
+            if appendSpaceAtEnd then
+                rest ++ " "
+            else
+                rest
+
+        left =
+            String.slice 0 pos d.text
+                |> Debug.log "left"
+
+        right =
+            String.slice pos (String.length d.text) d.text
+                |> Debug.log "right"
+
+        newCaretPos =
+            pos + (String.length textToInsert)
+
+    in
+    ( Model
+        { d
+            | text =
+                    left ++ textToInsert ++ right
+                        |> Debug.log "newText"
+            , predictions =
+                Closed
+            , selection =
+                Just <| Range.range newCaretPos newCaretPos
+        }
+    , Cmd.batch
+        [ cmd
+        , triggerHighlightNow
+        ]
+    )
+
+
+
 
 
 

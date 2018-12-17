@@ -46,6 +46,7 @@ type Msg
     | DebounceMsg Debounce.Msg
     | TriggerHighlight
     | GetPredictionCharViewport (Result Dom.Error Dom.Element)
+    | PredictionClicked Int
     | NoOp
 
 
