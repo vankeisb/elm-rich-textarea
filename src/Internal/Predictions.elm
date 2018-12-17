@@ -8,6 +8,7 @@ module Internal.Predictions exposing
     , moveDown
     , getInitialCaretPos
     , applyFilter
+    , getSelected
     )
 
 
@@ -78,6 +79,11 @@ getInitialCaretPos: PredictionsData p -> Int
 getInitialCaretPos (PredictionsData pd) =
     pd.initialCaretPos
 
+
+
+getSelected: PredictionsData p -> Maybe p
+getSelected (PredictionsData pd) =
+    pd.selected
 
 
 type Predictions p

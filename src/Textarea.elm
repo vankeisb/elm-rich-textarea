@@ -336,7 +336,7 @@ view config (Model d) =
                         (\keyCode ctrlKey start end ->
                             let
                                 stopEvt =
-                                    if keyCode == 9 then
+                                    if Debug.log "kc" keyCode == 9 then
                                         -- stop tab
                                         True
                                     else
@@ -352,13 +352,8 @@ view config (Model d) =
                                                 False
 
                                             Open _ _ ->
-                                                -- prediction view is open,
-                                                -- we stop propagation for
-                                                -- everything at the moment.
-                                                -- we'll need to be more subtle,
-                                                -- and only stop up/down nav keys
-                                                -- and such stuff here...
-                                                if keyCode == 38 || keyCode == 40 then
+                                                -- prediction view is open, stop only some events
+                                                if keyCode == 13 || keyCode == 38 || keyCode == 40 || keyCode == 32 || keyCode == 9 then
                                                     True
                                                 else
                                                     False
@@ -422,33 +417,40 @@ viewPredictions lift predConf d =
                 text "Loading..."
 
         Open e predictionsData ->
-            wrap e <|
-                table
-                    [ style "border-spacing" "0" ]
-                    [ tbody
-                        []
-                        ( Predictions.toList predictionsData
-                            |> List.map
-                                (\pred ->
-                                    tr
-                                        [ style "background-color" <|
-                                            if Predictions.isSelected pred predictionsData then
-                                                "lightblue"
-                                            else
-                                                ""
-                                        ]
-                                        [ td
-                                            []
-                                            [ predConf.icon pred
-                                                |> Maybe.withDefault (text "")
+            let
+                preds =
+                    Predictions.toList predictionsData
+            in
+            if List.isEmpty preds then
+                wrap e <| text "empty !"
+            else
+                wrap e <|
+                    table
+                        [ style "border-spacing" "0" ]
+                        [ tbody
+                            []
+                            ( preds
+                                |> List.map
+                                    (\pred ->
+                                        tr
+                                            [ style "background-color" <|
+                                                if Predictions.isSelected pred predictionsData then
+                                                    "lightblue"
+                                                else
+                                                    ""
                                             ]
-                                        , td
-                                            []
-                                            [ text <| predConf.text pred ]
-                                        ]
-                                )
-                        )
-                    ]
+                                            [ td
+                                                []
+                                                [ predConf.icon pred
+                                                    |> Maybe.withDefault (text "")
+                                                ]
+                                            , td
+                                                []
+                                                [ text <| predConf.text pred ]
+                                            ]
+                                    )
+                            )
+                        ]
 
 
 renderStyledText : ModelData s p -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
@@ -1047,11 +1049,6 @@ onKey config isDown keyCode ctrlKey start end d =
                 ( d.text
                 , Just <| Range.range start end
                 )
-
-
-
---        newPredictions =
---            handlePredictionsNav isDown keyCode d.predictions
     in
     ( Model
         { d
@@ -1085,64 +1082,116 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
         withCmd c m =
             (m, Cmd.batch [ cmd, c ])
     in
-    case d.predictions of
-        Closed ->
-            -- trigger preds if needed
-            Model d
-                |> withCmd
-                    (
-                        if isPredictionTrigger then
-                            Dom.getElement
-                                (charId d start)
-                                |> Task.attempt GetPredictionCharViewport
-                        else
-                            Cmd.none
-                    )
+    case config.predictionConfig of
+        Nothing ->
+            (Model d, cmd)
+        Just predictionConfig ->
+            case d.predictions of
+                Closed ->
+                    -- trigger preds if needed
+                    Model d
+                        |> withCmd
+                            (
+                                if isPredictionTrigger then
+                                    Dom.getElement
+                                        (charId d start)
+                                        |> Task.attempt GetPredictionCharViewport
+                                else
+                                    Cmd.none
+                            )
 
-        Loading _ ->
-            if escapeKey then
-                -- close predictions on ESC
-                setPredictions Closed
-                    |> withCmd Cmd.none
-            else
-                Model d
-                    |> withCmd Cmd.none
+                Loading _ ->
+                    if escapeKey then
+                        -- close predictions on ESC
+                        setPredictions Closed
+                            |> withCmd Cmd.none
+                    else
+                        Model d
+                            |> withCmd Cmd.none
 
-        Open e pd ->
-            if keyCode == 38 && isDown then
-                -- UP
-                pd
-                    |> Predictions.moveUp
-                    |> Open e
-                    |> setPredictions
-                    |> withCmd Cmd.none
+                Open e pd ->
+                    if keyCode == 38 && isDown then
+                        -- UP
+                        pd
+                            |> Predictions.moveUp
+                            |> Open e
+                            |> setPredictions
+                            |> withCmd Cmd.none
 
-            else if keyCode == 40 && isDown then
-                -- down
-                pd
-                    |> Predictions.moveDown
-                    |> Open e
-                    |> setPredictions
-                    |> withCmd Cmd.none
+                    else if keyCode == 40 && isDown then
+                        -- down
+                        pd
+                            |> Predictions.moveDown
+                            |> Open e
+                            |> setPredictions
+                            |> withCmd Cmd.none
 
-            else if keyCode == 27 && isDown then
-                -- close predictions on ESC
-                setPredictions Closed
-                    |> withCmd Cmd.none
+                    else if keyCode == 27 && isDown then
+                        -- close predictions on ESC
+                        setPredictions Closed
+                            |> withCmd Cmd.none
 
-            else if keyCode == 13 && isDown then
-                -- ENTER : insert selected prediction if any
-                setPredictions Closed
-                    |> withCmd Cmd.none
+                    else if (keyCode == 13 || keyCode == 32 || keyCode == 9) && isDown then
+                        -- ENTER | SPACE : insert selected prediction if any
+                        let
+                            textToInsert =
+                                Predictions.getSelected pd
+                                    |> Maybe.map
+                                        (\pred ->
+                                            let
+                                                predText =
+                                                    predictionConfig.text pred
 
-            else if not isDown then
-                -- compare current caret pos to "initial" pos, when
-                -- predictions have been triggered.
-                -- if negative then just close preds.
-                -- if positive then get the text, and use it to
-                -- filter the predictions
-                case config.predictionConfig of
-                    Just predictionConfig ->
+                                                prefix =
+                                                    getPrefixUntilSpace start d.text
+
+                                                rest =
+                                                    String.slice (String.length prefix) (String.length predText) predText
+                                            in
+                                            if keyCode == 32 || keyCode == 9 then
+                                                rest ++ " "
+                                            else
+                                                rest
+                                        )
+                        in
+                        case textToInsert of
+                            Just toInsert ->
+                                let
+                                    left =
+                                        String.slice 0 start d.text
+                                            |> Debug.log "left"
+
+                                    right =
+                                        String.slice start (String.length d.text) d.text
+                                            |> Debug.log "right"
+
+                                    newCaretPos =
+                                        start + (String.length toInsert)
+                                in
+                                ( Model
+                                    { d
+                                        | text =
+                                                left ++ toInsert ++ right
+                                                    |> Debug.log "newText"
+                                        , predictions =
+                                            Closed
+                                        , selection =
+                                            Just <| Range.range newCaretPos newCaretPos
+                                    }
+                                    |> withCmd triggerHighlightNow
+                                )
+
+                            Nothing ->
+                                setPredictions Closed
+                                    |> withCmd Cmd.none
+
+
+                    else if not isDown then
+                        -- compare current caret pos to "initial" pos, when
+                        -- predictions have been triggered.
+                        -- if negative then just close preds.
+                        -- if positive then get the text, and use it to
+                        -- filter the predictions
                         case d.selection of
                             Just selection ->
                                 let
@@ -1179,12 +1228,9 @@ handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
                                 Model d
                                     |> withCmd Cmd.none
 
-                    Nothing ->
+                    else
                         Model d
                             |> withCmd Cmd.none
-            else
-                Model d
-                    |> withCmd Cmd.none
 
 
 
@@ -1420,29 +1466,45 @@ predictResponseDecoder predictionDecoder =
 
 
 
-applyPredictions: PredictionResponse p -> Model s p -> (Model s p, Cmd Msg)
-applyPredictions preds (Model d) =
-    (
-        if d.predictionId == preds.id then
-            case d.predictions of
-                Loading e ->
-                    case d.selection of
-                        Just selection ->
-                            Model
-                                { d
-                                    | predictions =
-                                        Open e <|
-                                            Predictions.fromList
+applyPredictions: Config s p m -> PredictionResponse p -> Model s p -> (Model s p, Cmd Msg)
+applyPredictions config preds (Model d) =
+    ( case config.predictionConfig of
+        Just predictionConfig ->
+            (
+                if d.predictionId == preds.id then
+                    case d.predictions of
+                        Loading e ->
+                            case d.selection of
+                                Just selection ->
+                                    let
+                                        newPredData =
+                                            ( Predictions.fromList
                                                 (Range.getFrom selection)
                                                 preds.predictions
-                                }
+                                            )
+                                                |> applyFilter
+                                                    predictionConfig.text
+                                                    (getPrefixUntilSpace
+                                                        (Range.getFrom selection)
+                                                        (d.text)
+                                                    )
+                                    in
+                                    Model
+                                        { d
+                                            | predictions =
+                                                Open e newPredData
+                                        }
 
-                        Nothing ->
+                                Nothing ->
+                                    Model d
+
+                        _ ->
                             Model d
-
-                _ ->
+                else
                     Model d
-        else
+            )
+
+        Nothing ->
             Model d
     )
         |> noCmd
