@@ -5,6 +5,7 @@ module Internal.Textarea exposing
     , ModelData
     , Msg(..)
     , encodeUuid
+    , nextUuid
     , uuidDecoder
     , initialUuid
     , lineSize
@@ -57,6 +58,11 @@ initialUuid =
     Uuid 0
 
 
+nextUuid: Uuid -> Uuid
+nextUuid (Uuid i) =
+    Uuid (i + 1)
+
+
 
 type alias ModelData s p =
     { idPrefix : String
@@ -71,7 +77,7 @@ type alias ModelData s p =
     , debounce : Debounce.Debounce Uuid
     , debounceMs : Float
     , predictions: Predictions p
-
+    , predictionId: Uuid
     }
 
 

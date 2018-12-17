@@ -14,7 +14,7 @@ module Textarea exposing
     , encodePredictionRequest
     , predictResponseDecoder
     , PredictionRequest
-    , PredictResponse
+    , PredictionResponse
     , applyPredictions
     , PredictionConfig
     , init
@@ -76,9 +76,17 @@ type alias PredictionId =
 
 
 type alias PredictionRequest =
-    { text: String
+    { id: PredictionId
+    , text: String
     , offset: Int
     }
+
+
+type alias PredictionResponse p =
+    { id: PredictionId
+    , predictions: List p
+    }
+
 
 
 {-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
@@ -139,6 +147,7 @@ init initData =
             , debounce = Debounce.init
             , debounceMs = initData.debounceMs
             , predictions = Closed
+            , predictionId = initialUuid
             }
     in
     ( Model initialModelData
@@ -934,17 +943,24 @@ update msg (Model model) =
         GetPredictionCharViewport (Ok element) ->
             -- we've got the position, let's show the
             -- prediction view
+            let
+                newPredictionId =
+                    nextUuid model.predictionId
+            in
             ( Model
                 { model
                     | predictions =
                         Loading element
+                    , predictionId =
+                        newPredictionId
                 }
             , Cmd.none
             , model.selection
                 |> Maybe.map
                     (\sel ->
                         RequestPrediction
-                            { text = model.text
+                            { id = newPredictionId
+                            , text = model.text
                             , offset = Range.getFrom sel
                             }
                     )
@@ -1143,11 +1159,18 @@ handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
                                 |> withCmd Cmd.none
                         else
                             let
+                                prefix =
+                                    getPrefixUntilSpace initialCaretPos d.text
+
                                 str =
                                     String.slice initialCaretPos currentCaretPos d.text
+
+                                filter =
+                                    prefix ++ str
+                                        |> Debug.log "filter"
                             in
                             pd
-                                |> Predictions.applyFilter str
+                                |> Predictions.applyFilter filter
                                 |> Open e
                                 |> setPredictions
                                 |> withCmd Cmd.none
@@ -1160,6 +1183,19 @@ handlePredictionsNav isDown keyCode ctrlKey start end (Model d, cmd) =
                 Model d
                     |> withCmd Cmd.none
 
+
+
+getPrefixUntilSpace : Int -> String -> String
+getPrefixUntilSpace caretPos text =
+    String.slice 0 caretPos text
+        |> String.split "\n"
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault ""
+        |> String.split " "
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault ""
 
 
 getViewportPos : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
@@ -1363,45 +1399,47 @@ rangeDecoder =
 
 
 
-type alias PredictResponse p =
-    { predictions: List p
-    }
-
 
 encodePredictionRequest : PredictionRequest -> Encode.Value
 encodePredictionRequest r =
     Encode.object
-        [ ( "text", Encode.string r.text )
+        [ ( "id", encodeUuid r.id )
+        , ( "text", Encode.string r.text )
         , ( "offset", Encode.int r.offset)
         ]
 
 
-predictResponseDecoder: Json.Decoder p -> Json.Decoder (PredictResponse p)
+predictResponseDecoder: Json.Decoder p -> Json.Decoder (PredictionResponse p)
 predictResponseDecoder predictionDecoder =
-    Json.map PredictResponse
+    Json.map2 PredictionResponse
+        (Json.field "id" uuidDecoder)
         (Json.field "predictions" <| Json.list predictionDecoder)
 
 
 
-applyPredictions: List p -> Model s p -> (Model s p, Cmd Msg)
+applyPredictions: PredictionResponse p -> Model s p -> (Model s p, Cmd Msg)
 applyPredictions preds (Model d) =
-    ( case d.predictions of
-        Loading e ->
-            case d.selection of
-                Just selection ->
-                    Model
-                        { d
-                            | predictions =
-                                Open e <|
-                                    Predictions.fromList
-                                        (Range.getFrom selection)
-                                        preds
-                        }
+    (
+        if d.predictionId == preds.id then
+            case d.predictions of
+                Loading e ->
+                    case d.selection of
+                        Just selection ->
+                            Model
+                                { d
+                                    | predictions =
+                                        Open e <|
+                                            Predictions.fromList
+                                                (Range.getFrom selection)
+                                                preds.predictions
+                                }
 
-                Nothing ->
+                        Nothing ->
+                            Model d
+
+                _ ->
                     Model d
-
-        _ ->
+        else
             Model d
     )
         |> noCmd

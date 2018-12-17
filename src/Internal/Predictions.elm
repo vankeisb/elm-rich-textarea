@@ -37,12 +37,13 @@ fromList: Int -> List p -> PredictionsData p
 fromList caretPos ps =
     PredictionsData
         { start = []
-        , selected = Nothing
-        , end = []
+        , selected = List.head ps
+        , end =
+            List.tail ps
+                |> Maybe.withDefault []
         , initialCaretPos = caretPos
         , allItems = ps
         }
-        |> applyFilter ""
 
 
 isSelected: p -> PredictionsData p -> Bool
@@ -112,19 +113,20 @@ moveDown (PredictionsData d) =
 
 applyFilter: String -> PredictionsData p -> PredictionsData p
 applyFilter s (PredictionsData pd) =
-    let
-        preds =
-            pd.allItems
-
-        x =
-            Debug.log "applyFilter" s
-    in
-    PredictionsData
-        { pd
-            | start = []
-            , selected = List.head preds
-            , end =
-                List.tail preds
-                    |> Maybe.withDefault []
-        }
+    PredictionsData pd
+--    let
+--        preds =
+--            pd.allItems
+--
+--        x =
+--            Debug.log "applyFilter" s
+--    in
+--    PredictionsData
+--        { pd
+--            | start = []
+--            , selected = List.head preds
+--            , end =
+--                List.tail preds
+--                    |> Maybe.withDefault []
+--        }
 

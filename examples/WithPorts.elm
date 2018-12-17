@@ -178,7 +178,7 @@ update msg model =
                     let
                         (tm, tc) =
                             Textarea.applyPredictions
-                                predictResponse.predictions
+                                predictResponse
                                 model.textareaModel
                     in
                     (
