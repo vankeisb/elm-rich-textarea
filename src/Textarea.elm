@@ -167,6 +167,7 @@ requestHighlight ( Model model, cmd ) =
     ( Model
         { model
             | debounce = debounce
+            , highlightId = nextUuid model.highlightId
         }
     , Cmd.batch
         [ cmd
