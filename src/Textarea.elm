@@ -1,5 +1,6 @@
 module Textarea exposing
-    ( HighlightId
+    ( Config
+    , HighlightId
     , HighlightRequest
     , HighlightResponse
     , InitData
@@ -203,12 +204,21 @@ type alias Highlighter s m =
 type alias PredictionRenderer p m = p -> Html m
 
 
+type alias Config s p m =
+    { lift: Msg -> m
+    , highlighter: Highlighter s m
+    , predictionRenderer: Maybe (PredictionRenderer p m)
+    }
+
 
 {-| Render the rich textarea widget.
 -}
-view : (Msg -> m) -> Highlighter s m -> PredictionRenderer p m -> Model s p -> Html m
-view lift highlighter predRenderer (Model d) =
+view : Config s p m -> Model s p -> Html m
+view config (Model d) =
     let
+        lift =
+            config.lift
+
         lines =
             d.styledTexts
                 |> List.indexedMap
@@ -221,7 +231,7 @@ view lift highlighter predRenderer (Model d) =
                             ]
                             (lineElems
                                 |> List.map
-                                    (renderStyledText d lift highlighter)
+                                    (renderStyledText d lift config.highlighter)
                             )
                     )
 
@@ -280,7 +290,11 @@ view lift highlighter predRenderer (Model d) =
                     }
         """
             ]
-        , viewPredictions lift predRenderer d
+        , case config.predictionRenderer of
+            Just predictionRenderer ->
+                viewPredictions lift predictionRenderer d
+            Nothing ->
+                text ""
         , Html.map lift <|
             textarea
                 [ value d.text

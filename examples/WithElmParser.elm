@@ -28,14 +28,11 @@ type MyStyle
     | Identifier
 
 
-type alias MyPrediction = String
-
-
 {-
     Your Model should keep the textarea's Model, that's parent/child...
 -}
 type alias Model =
-    { textareaModel : Textarea.Model MyStyle MyPrediction
+    { textareaModel : Textarea.Model MyStyle ()
     }
 
 
@@ -54,6 +51,16 @@ init idPrefix =
     )
 
 
+
+config: Textarea.Config MyStyle () Msg
+config =
+    { lift = TextareaMsg
+    , highlighter = renderer
+    , predictionRenderer = Nothing
+    }
+
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -62,11 +69,7 @@ view model =
         , style "position" "relative"
         , style "border" "1px solid lightgray"
         ]
-        [ Textarea.view
-            TextareaMsg
-            renderer
-            (\p -> text <| Debug.toString p)
-            model.textareaModel
+        [ Textarea.view config model.textareaModel
         ]
 
 
@@ -145,10 +148,7 @@ update msg model =
                                 (highlight hr.text)
                                 tm
 
-                        Just (Textarea.RequestPrediction pr) ->
-                            Debug.log "request prediction!!" tm
-
-                        Nothing ->
+                        _ ->
                             tm
             in
             ( { model

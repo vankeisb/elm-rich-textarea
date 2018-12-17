@@ -58,6 +58,15 @@ init idPrefix =
     )
 
 
+config: Textarea.Config MyStyle MyPrediction Msg
+config =
+    { lift = TextareaMsg
+    , highlighter = highlighter
+    , predictionRenderer = Just predictionRenderer
+    }
+
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -66,16 +75,12 @@ view model =
         , style "position" "relative"
         , style "border" "1px solid lightgray"
         ]
-        [ Textarea.view
-            TextareaMsg
-            renderer
-            predictionRenderer
-            model.textareaModel
+        [ Textarea.view config model.textareaModel
         ]
 
 
-renderer : List MyStyle -> List (Html.Attribute Msg)
-renderer myStyles =
+highlighter : List MyStyle -> List (Html.Attribute Msg)
+highlighter myStyles =
     myStyles
         |> List.foldl
             (\myStyle attrs ->
