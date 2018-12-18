@@ -1,5 +1,6 @@
 module Textarea exposing
-    ( HighlightId
+    ( Config
+    , HighlightId
     , HighlightRequest
     , HighlightResponse
     , InitData
@@ -10,6 +11,12 @@ module Textarea exposing
     , defaultInitData
     , encodeHighlightRequest
     , highlightResponseDecoder
+    , encodePredictionRequest
+    , predictResponseDecoder
+    , PredictionRequest
+    , PredictionResponse
+    , applyPredictions
+    , PredictionConfig
     , init
     , subscriptions
     , update
@@ -28,6 +35,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Internal.Styles as S exposing (StyledText, Styles)
 import Internal.Textarea exposing (..)
+import Internal.Predictions as Predictions exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
 import Process
@@ -39,8 +47,8 @@ import Time exposing (Posix)
 
 {-| Model, should be stored in the parent's
 -}
-type alias Model s =
-    Internal.Textarea.Model s
+type alias Model s p =
+    Internal.Textarea.Model s p
 
 
 {-| Msgs should be relayed by the parent
@@ -52,7 +60,7 @@ type alias Msg =
 {-| Opaque type for highlight ID.
 -}
 type alias HighlightId =
-    Internal.Textarea.HighlightId
+    Internal.Textarea.Uuid
 
 
 {-| Highlight request indicates that the editor need to highlight the text
@@ -63,10 +71,29 @@ type alias HighlightRequest =
     }
 
 
+type alias PredictionId =
+    Internal.Textarea.Uuid
+
+
+type alias PredictionRequest =
+    { id: PredictionId
+    , text: String
+    , offset: Int
+    }
+
+
+type alias PredictionResponse p =
+    { id: PredictionId
+    , predictions: List p
+    }
+
+
+
 {-| Follows the "OutMsg" pattern. Parents should handle out msg and act accordingly.
 -}
 type OutMsg
     = RequestHighlight HighlightRequest
+    | RequestPrediction PredictionRequest
 
 
 {-| Init dat afor the textarea
@@ -97,7 +124,7 @@ defaultInitData idPrefix initialText =
 
 {-| initialize everything, and triggers the initial highlight request.
 -}
-init : InitData -> ( Model s, Cmd Msg )
+init : InitData -> ( Model s p, Cmd Msg )
 init initData =
     let
         initialModelData =
@@ -116,20 +143,22 @@ init initData =
                 , scrollLeft = 0
                 }
             , selectingAt = Nothing
-            , highlightId = initialHighlightId
+            , highlightId = initialUuid
             , debounce = Debounce.init
             , debounceMs = initData.debounceMs
+            , predictions = Closed
+            , predictionId = initialUuid
             }
     in
     ( Model initialModelData
-        |> applyStyles initialHighlightId []
+        |> applyStyles initialUuid []
         |> computeStyledTexts
     , triggerHighlightNow
     )
         |> getViewportPos
 
 
-requestHighlight : ( Model m, Cmd Msg ) -> ( Model m, Cmd Msg, Maybe OutMsg )
+requestHighlight : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 requestHighlight ( Model model, cmd ) =
     let
         ( debounce, debounceCmd ) =
@@ -138,6 +167,7 @@ requestHighlight ( Model model, cmd ) =
     ( Model
         { model
             | debounce = debounce
+            , highlightId = nextUuid model.highlightId
         }
     , Cmd.batch
         [ cmd
@@ -147,33 +177,34 @@ requestHighlight ( Model model, cmd ) =
         |> noOut
 
 
-withOutMsg : Maybe OutMsg -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+
+withOutMsg : Maybe OutMsg -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 withOutMsg outMsg ( model, cmd ) =
     ( model, cmd, outMsg )
 
 
-noOut : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg, Maybe OutMsg )
+noOut : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg, Maybe OutMsg )
 noOut =
     withOutMsg Nothing
 
 
-focusTextarea : ModelData s -> Cmd Msg
+focusTextarea : ModelData s p -> Cmd Msg
 focusTextarea d =
     Dom.focus (textareaId d)
         |> Task.attempt Focused
 
 
-textareaId : ModelData s -> String
+textareaId : ModelData s p -> String
 textareaId d =
     d.idPrefix ++ "-textarea"
 
 
-viewportId : ModelData s -> String
+viewportId : ModelData s p -> String
 viewportId d =
     d.idPrefix ++ "-viewport"
 
 
-charId : ModelData s -> Int -> String
+charId : ModelData s p -> Int -> String
 charId d i =
     d.idPrefix ++ "-char-" ++ String.fromInt i
 
@@ -185,18 +216,28 @@ type alias Highlighter s m =
 
 
 
--- used to display the textarea
+
+type alias PredictionConfig p m =
+    { icon: p -> Maybe (Html m)
+    , text: p -> String
+    }
 
 
-devMode =
-    False
+type alias Config s p m =
+    { lift: Msg -> m
+    , highlighter: Highlighter s m
+    , predictionConfig: Maybe (PredictionConfig p m)
+    }
 
 
 {-| Render the rich textarea widget.
 -}
-view : (Msg -> m) -> Highlighter s m -> Model s -> Html m
-view lift highlighter (Model d) =
+view : Config s p m -> Model s p -> Html m
+view config (Model d) =
     let
+        lift =
+            config.lift
+
         lines =
             d.styledTexts
                 |> List.indexedMap
@@ -209,7 +250,7 @@ view lift highlighter (Model d) =
                             ]
                             (lineElems
                                 |> List.map
-                                    (renderStyledText d lift highlighter)
+                                    (renderStyledText d lift config.highlighter)
                             )
                     )
 
@@ -268,24 +309,19 @@ view lift highlighter (Model d) =
                     }
         """
             ]
+        , case config.predictionConfig of
+            Just predConf ->
+                viewPredictions lift predConf d
+            Nothing ->
+                text ""
         , Html.map lift <|
             textarea
                 [ value d.text
                 , id <| textareaId d
                 , style "position" "fixed"
                 , style "padding" "0"
-                , style "left" <|
-                    if devMode then
-                        "350px"
-
-                    else
-                        "-10000px"
-                , style "top" <|
-                    if devMode then
-                        "65px"
-
-                    else
-                        "-10000px"
+                , style "left" "-10000px"
+                , style "top" "-10000px"
                 , style "width" "200px"
                 , style "height" "100px"
                 , property "selectionStart" <| Encode.int ss
@@ -297,37 +333,57 @@ view lift highlighter (Model d) =
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , custom "keydown" <|
-                    Json.map3
-                        (\keyCode start end ->
-                            { message = OnKeyDown keyCode start end
-                            , preventDefault =
-                                keyCode == 9
+                    Json.map4
+                        (\keyCode ctrlKey start end ->
+                            let
+                                stopEvt =
+                                    if Debug.log "kc" keyCode == 9 then
+                                        -- stop tab
+                                        True
+                                    else
+                                        case d.predictions of
+                                            Closed ->
+                                                if config.predictionConfig /= Nothing then
+                                                    -- stop ctrl-space
+                                                    keyCode == 32 && ctrlKey
+                                                else
+                                                    False
 
-                            -- stop tab
-                            , stopPropagation =
-                                keyCode == 9
+                                            Loading _ ->
+                                                False
 
-                            -- stop tab
+                                            Open _ _ ->
+                                                -- prediction view is open, stop only some events
+                                                if keyCode == 13 || keyCode == 38 || keyCode == 40 || keyCode == 32 || keyCode == 9 then
+                                                    True
+                                                else
+                                                    False
+
+
+                            in
+                            { message = OnKeyDown keyCode ctrlKey start end
+                            , preventDefault = stopEvt
+                            , stopPropagation = stopEvt
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "ctrlKey" ] Json.bool)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , custom "keyup" <|
-                    Json.map3
-                        (\keyCode start end ->
-                            { message = OnKeyUp keyCode start end
+                    Json.map4
+                        (\keyCode ctrlKey start end ->
+                            { message = OnKeyUp keyCode ctrlKey start end
                             , preventDefault =
                                 keyCode == 9
 
                             -- stop tab
                             , stopPropagation =
                                 keyCode == 9
-
-                            -- stop tab
                             }
                         )
                         (Json.at [ "keyCode" ] Json.int)
+                        (Json.at [ "ctrlKey" ] Json.bool)
                         (Json.at [ "target", "selectionStart" ] Json.int)
                         (Json.at [ "target", "selectionEnd" ] Json.int)
                 , on "blur" <|
@@ -337,7 +393,92 @@ view lift highlighter (Model d) =
         ]
 
 
-renderStyledText : ModelData s -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
+viewPredictions: (Msg -> m) -> PredictionConfig p m -> ModelData s p -> Html m
+viewPredictions lift predConf d =
+    let
+        wrap e h =
+            div
+                [ style "background-color" "whitesmoke"
+                , style "opacity" "1"
+                , style "padding" "4px"
+                , style "border" "1px solid lightgrey"
+                , style "position" "absolute"
+                , style "left" <| String.fromInt (round (e.element.x - d.viewportBox.x)) ++ "px"
+                , style "top" <| String.fromInt (round (e.element.y - d.viewportBox.y + e.element.height)) ++ "px"
+                ]
+                [ h ]
+
+    in
+    case d.predictions of
+        Closed ->
+            text ""
+
+        Loading e ->
+            wrap e <|
+                text "Loading..."
+
+        Open e predictionsData ->
+            let
+                preds =
+                    Predictions.toList predictionsData
+            in
+            if List.isEmpty preds then
+                wrap e <| text "empty !"
+            else
+                wrap e <|
+                    table
+                        [ style "border-spacing" "0" ]
+                        [ tbody
+                            []
+                            ( preds
+                                |> List.indexedMap
+                                    (\i pred ->
+                                        tr
+                                            [ style "background-color" <|
+                                                if Predictions.isSelected pred predictionsData then
+                                                    "lightblue"
+                                                else
+                                                    ""
+                                            ]
+                                            [ td
+                                                [ custom "mousedown" <|
+                                                    Json.succeed
+                                                        { message = lift <| NoOp
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                , custom "mouseup" <|
+                                                    Json.succeed
+                                                        { message = lift <| PredictionClicked i
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                ]
+                                                [ predConf.icon pred
+                                                    |> Maybe.withDefault (text "")
+                                                ]
+                                            , td
+                                                [ custom "mousedown" <|
+                                                    Json.succeed
+                                                        { message = lift <| NoOp
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                , custom "mouseup" <|
+                                                    Json.succeed
+                                                        { message = lift <| PredictionClicked i
+                                                        , preventDefault = True
+                                                        , stopPropagation = True
+                                                        }
+                                                ]
+                                                [ text <| predConf.text pred ]
+                                            ]
+                                    )
+                            )
+                        ]
+
+
+renderStyledText : ModelData s p -> (Msg -> m) -> Highlighter s m -> StyledText s -> Html m
 renderStyledText m lift highlighter st =
     let
         dataFrom f =
@@ -418,7 +559,7 @@ renderStyledText m lift highlighter st =
         )
 
 
-computeStyledTexts : Model s -> Model s
+computeStyledTexts : Model s p -> Model s p
 computeStyledTexts (Model d) =
     Model
         { d
@@ -448,7 +589,7 @@ noCmd m =
     ( m, Cmd.none )
 
 
-setSelection : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+setSelection : Maybe Range -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 setSelection r ( Model d, c ) =
     ( Model
         { d
@@ -460,7 +601,7 @@ setSelection r ( Model d, c ) =
         |> scrollCaretIntoView d.selection
 
 
-updateIfSelecting : (Model s -> Model s) -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+updateIfSelecting : (Model s p -> Model s p) -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 updateIfSelecting fun ( Model model, c ) =
     if model.selectingAt /= Nothing then
         ( Model model, c )
@@ -471,8 +612,8 @@ updateIfSelecting fun ( Model model, c ) =
         ( Model model, c )
 
 
-update : Msg -> Model s -> ( Model s, Cmd Msg, Maybe OutMsg )
-update msg (Model model) =
+update : Config s p m -> Msg -> Model s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
+update config msg (Model model) =
     case msg of
         OnInput s start end ->
             Model
@@ -499,11 +640,11 @@ update msg (Model model) =
                 |> setSelection (Just (Range.range start end))
                 |> requestHighlight
 
-        OnKeyDown keyCode start end ->
-            onKey True keyCode start end model
+        OnKeyDown keyCode ctrlKey start end ->
+            onKey config True keyCode ctrlKey start end model
 
-        OnKeyUp keyCode start end ->
-            onKey False keyCode start end model
+        OnKeyUp keyCode ctrlKey start end ->
+            onKey config False keyCode ctrlKey start end model
 
         MouseDown i ->
             setCaretPos i (Model model)
@@ -634,6 +775,8 @@ update msg (Model model) =
             Model
                 { model
                     | focused = False
+                    , predictions =
+                        Closed
                 }
                 |> setSelectingAt Nothing
                 |> noCmd
@@ -829,6 +972,81 @@ update msg (Model model) =
                             }
                     )
 
+        GetPredictionCharViewport (Ok element) ->
+            -- we've got the position, let's show the
+            -- prediction view
+            let
+                newPredictionId =
+                    nextUuid model.predictionId
+            in
+            ( Model
+                { model
+                    | predictions =
+                        Loading element
+                    , predictionId =
+                        newPredictionId
+                }
+            , Cmd.none
+            , model.selection
+                |> Maybe.map
+                    (\sel ->
+                        RequestPrediction
+                            { id = newPredictionId
+                            , text = model.text
+                            , offset = Range.getFrom sel
+                            }
+                    )
+            )
+
+        GetPredictionCharViewport (Err _) ->
+            -- TODO
+            Model model |> noCmd |> noOut
+
+
+        PredictionClicked index ->
+            ( case config.predictionConfig of
+                Just predictionConfig ->
+                    case model.predictions of
+                        Open _ pd ->
+                            let
+                                clickedPred =
+                                    Predictions.toList pd
+                                        |> Array.fromList
+                                        |> Array.get index
+                            in
+                            case clickedPred of
+                                Just clicked ->
+                                    case model.selection of
+                                        Just sel ->
+                                            if Predictions.getSelected pd == Just clicked then
+                                                insertPrediction
+                                                    predictionConfig
+                                                    clicked
+                                                    False
+                                                    pd
+                                                    (Range.getFrom sel)
+                                                    (Model model, Cmd.none)
+                                            else
+                                                (Model
+                                                    { model
+                                                        | predictions =
+                                                            Predictions.setSelected clicked model.predictions
+                                                    }
+                                                , Cmd.none
+                                                )
+
+                                        Nothing ->
+                                            Model model |> noCmd
+                                Nothing ->
+                                    Model model |> noCmd
+                        _ ->
+                            Model model |> noCmd
+                Nothing ->
+                    Model model |> noCmd
+            )
+                |> noOut
+
+
 
 triggerHighlightNow : Cmd Msg
 triggerHighlightNow =
@@ -836,7 +1054,7 @@ triggerHighlightNow =
         |> Task.perform (\_ -> TriggerHighlight)
 
 
-setCaretPos : Int -> Model s -> ( Model s, Cmd Msg )
+setCaretPos : Int -> Model s p -> ( Model s p, Cmd Msg )
 setCaretPos i (Model d) =
     ( Model d
         |> setSelectingAt (Just i)
@@ -844,17 +1062,17 @@ setCaretPos i (Model d) =
     )
 
 
-setSelectingAt : Maybe Int -> Model s -> Model s
+setSelectingAt : Maybe Int -> Model s p -> Model s p
 setSelectingAt at (Model d) =
     Model { d | selectingAt = at }
 
 
-expandSelection : Int -> Model s -> Model s
+expandSelection : Int -> Model s p -> Model s p
 expandSelection to (Model d) =
     Model { d | selection = Maybe.map (Range.expand to) d.selectingAt }
 
 
-expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s -> Model s
+expanSelectionWith : (Int -> String -> Maybe Range) -> Int -> Model s p -> Model s p
 expanSelectionWith fun pos (Model d) =
     let
         selection =
@@ -867,18 +1085,18 @@ expanSelectionWith fun pos (Model d) =
         }
 
 
-expandWordSelection : Int -> Model s -> Model s
+expandWordSelection : Int -> Model s p -> Model s p
 expandWordSelection =
     expanSelectionWith wordRangeAt
 
 
-expandLineSelection : Int -> Model s -> Model s
+expandLineSelection : Int -> Model s p -> Model s p
 expandLineSelection =
     expanSelectionWith lineRangeAt
 
 
-onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
-onKey isDown keyCode start end d =
+onKey : Config s p m -> Bool -> Int -> Bool -> Int -> Int -> ModelData s p -> ( Model s p, Cmd Msg, Maybe OutMsg )
+onKey config isDown keyCode ctrlKey start end d =
     let
         x =
             Debug.log "startOnKey" start
@@ -905,24 +1123,221 @@ onKey isDown keyCode start end d =
                         )
                     |> Maybe.withDefault
                         ( d.text, d.selection )
-
             else
                 ( d.text
                 , Just <| Range.range start end
                 )
     in
-    Model
+    ( Model
         { d
             | text = newText
         }
         |> computeStyledTexts
-        |> noCmd
+    , Cmd.none
+    )
         |> getViewportPos
         |> setSelection newSel
+        |> handlePredictionsNav config isDown keyCode ctrlKey start end
         |> requestHighlight
 
 
-getViewportPos : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+handlePredictionsNav: Config s p m -> Bool -> Int -> Bool -> Int -> Int -> (Model s p, Cmd Msg) -> (Model s p, Cmd Msg)
+handlePredictionsNav config isDown keyCode ctrlKey start end (Model d, cmd) =
+    let
+        isPredictionTrigger =
+            keyCode == 32 && ctrlKey && isDown
+
+        escapeKey =
+            keyCode == 27
+
+        setPredictions newPreds =
+            Model
+                { d
+                    | predictions =
+                        newPreds
+                }
+
+        withCmd c m =
+            (m, Cmd.batch [ cmd, c ])
+    in
+    case config.predictionConfig of
+        Nothing ->
+            (Model d, cmd)
+        Just predictionConfig ->
+            case d.predictions of
+                Closed ->
+                    -- trigger preds if needed
+                    Model d
+                        |> withCmd
+                            (
+                                if isPredictionTrigger then
+                                    Dom.getElement
+                                        (charId d start)
+                                        |> Task.attempt GetPredictionCharViewport
+                                else
+                                    Cmd.none
+                            )
+
+                Loading _ ->
+                    if escapeKey then
+                        -- close predictions on ESC
+                        setPredictions Closed
+                            |> withCmd Cmd.none
+                    else
+                        Model d
+                            |> withCmd Cmd.none
+
+                Open e pd ->
+                    if keyCode == 38 && isDown then
+                        -- UP
+                        pd
+                            |> Predictions.moveUp
+                            |> Open e
+                            |> setPredictions
+                            |> withCmd Cmd.none
+
+                    else if keyCode == 40 && isDown then
+                        -- down
+                        pd
+                            |> Predictions.moveDown
+                            |> Open e
+                            |> setPredictions
+                            |> withCmd Cmd.none
+
+                    else if keyCode == 27 && isDown then
+                        -- close predictions on ESC
+                        setPredictions Closed
+                            |> withCmd Cmd.none
+
+                    else if (keyCode == 13 || keyCode == 32 || keyCode == 9) && isDown then
+                        -- ENTER | SPACE : insert selected prediction if any
+                        case Predictions.getSelected pd of
+                            Just selPred ->
+                                (Model d, cmd)
+                                    |> insertPrediction
+                                        predictionConfig
+                                        selPred
+                                        (keyCode == 32 || keyCode == 9)
+                                        pd
+                                        start
+
+                            Nothing ->
+                                (Model d, cmd)
+
+                    else if not isDown then
+                        -- compare current caret pos to "initial" pos, when
+                        -- predictions have been triggered.
+                        -- if negative then just close preds.
+                        -- if positive then get the text, and use it to
+                        -- filter the predictions
+                        case d.selection of
+                            Just selection ->
+                                let
+                                    currentCaretPos =
+                                        Range.getFrom selection
+
+                                    initialCaretPos =
+                                         (Predictions.getInitialCaretPos pd)
+
+                                    delta =
+                                        currentCaretPos - initialCaretPos
+                                in
+                                if delta < 0 then
+                                    setPredictions Closed
+                                        |> withCmd Cmd.none
+                                else
+                                    let
+                                        prefix =
+                                            getPrefixUntilSpace initialCaretPos d.text
+
+                                        str =
+                                            String.slice initialCaretPos currentCaretPos d.text
+
+                                        filter =
+                                            prefix ++ str
+                                    in
+                                    pd
+                                        |> Predictions.applyFilter predictionConfig.text filter
+                                        |> Open e
+                                        |> setPredictions
+                                        |> withCmd Cmd.none
+
+                            Nothing ->
+                                Model d
+                                    |> withCmd Cmd.none
+
+                    else
+                        Model d
+                            |> withCmd Cmd.none
+
+
+
+
+insertPrediction predictionConfig pred appendSpaceAtEnd pd pos (Model d, cmd) =
+    let
+        textToInsert =
+            let
+                predText =
+                    predictionConfig.text pred
+
+                prefix =
+                    getPrefixUntilSpace pos d.text
+
+                rest =
+                    String.slice (String.length prefix) (String.length predText) predText
+            in
+            if appendSpaceAtEnd then
+                rest ++ " "
+            else
+                rest
+
+        left =
+            String.slice 0 pos d.text
+                |> Debug.log "left"
+
+        right =
+            String.slice pos (String.length d.text) d.text
+                |> Debug.log "right"
+
+        newCaretPos =
+            pos + (String.length textToInsert)
+
+    in
+    ( Model
+        { d
+            | text =
+                    left ++ textToInsert ++ right
+                        |> Debug.log "newText"
+            , predictions =
+                Closed
+            , selection =
+                Just <| Range.range newCaretPos newCaretPos
+        }
+    , Cmd.batch
+        [ cmd
+        , triggerHighlightNow
+        ]
+    )
+
+
+
+
+
+
+getPrefixUntilSpace : Int -> String -> String
+getPrefixUntilSpace caretPos text =
+    String.slice 0 caretPos text
+        |> String.split "\n"
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault ""
+        |> String.split " "
+        |> List.reverse
+        |> List.head
+        |> Maybe.withDefault ""
+
+
+getViewportPos : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 getViewportPos ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -933,7 +1348,7 @@ getViewportPos ( Model d, c ) =
     )
 
 
-getViewportSize : ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+getViewportSize : ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 getViewportSize ( Model d, c ) =
     ( Model d
     , Cmd.batch
@@ -944,7 +1359,7 @@ getViewportSize ( Model d, c ) =
     )
 
 
-scrollCaretIntoView : Maybe Range -> ( Model s, Cmd Msg ) -> ( Model s, Cmd Msg )
+scrollCaretIntoView : Maybe Range -> ( Model s p, Cmd Msg ) -> ( Model s p, Cmd Msg )
 scrollCaretIntoView prevRange ( Model d, c ) =
     let
         scrollCmd charIndex =
@@ -999,7 +1414,7 @@ scrollCaretIntoView prevRange ( Model d, c ) =
     )
 
 
-subscriptions : Model s -> Sub Msg
+subscriptions : Model s p -> Sub Msg
 subscriptions (Model model) =
     Sub.none
 
@@ -1061,7 +1476,7 @@ adjustIndex offsetX clientWidth =
         0
 
 
-applyStyles : HighlightId -> List ( Range, s ) -> Model s -> Model s
+applyStyles : HighlightId -> List ( Range, s ) -> Model s p -> Model s p
 applyStyles highlightId styles (Model model) =
     if model.highlightId == highlightId then
         Model
@@ -1085,7 +1500,7 @@ applyStyles highlightId styles (Model model) =
 encodeHighlightRequest : HighlightRequest -> Encode.Value
 encodeHighlightRequest r =
     Encode.object
-        [ ( "id", encodeHighlightId r.id )
+        [ ( "id", encodeUuid r.id )
         , ( "text", Encode.string r.text )
         ]
 
@@ -1109,7 +1524,7 @@ highlightResponseDecoder styleDecoder =
                 (Json.field "style" styleDecoder)
     in
     Json.map2 HighlightResponse
-        (Json.field "id" highlightIdDecoder)
+        (Json.field "id" uuidDecoder)
         (Json.field "styles" <|
             Json.list rangeAndStyleDecoder
         )
@@ -1120,3 +1535,66 @@ rangeDecoder =
     Json.map2 Range.range
         (Json.field "from" Json.int)
         (Json.field "to" Json.int)
+
+
+
+
+encodePredictionRequest : PredictionRequest -> Encode.Value
+encodePredictionRequest r =
+    Encode.object
+        [ ( "id", encodeUuid r.id )
+        , ( "text", Encode.string r.text )
+        , ( "offset", Encode.int r.offset)
+        ]
+
+
+predictResponseDecoder: Json.Decoder p -> Json.Decoder (PredictionResponse p)
+predictResponseDecoder predictionDecoder =
+    Json.map2 PredictionResponse
+        (Json.field "id" uuidDecoder)
+        (Json.field "predictions" <| Json.list predictionDecoder)
+
+
+
+applyPredictions: Config s p m -> PredictionResponse p -> Model s p -> (Model s p, Cmd Msg)
+applyPredictions config preds (Model d) =
+    ( case config.predictionConfig of
+        Just predictionConfig ->
+            (
+                if d.predictionId == preds.id then
+                    case d.predictions of
+                        Loading e ->
+                            case d.selection of
+                                Just selection ->
+                                    let
+                                        newPredData =
+                                            ( Predictions.fromList
+                                                (Range.getFrom selection)
+                                                preds.predictions
+                                            )
+                                                |> applyFilter
+                                                    predictionConfig.text
+                                                    (getPrefixUntilSpace
+                                                        (Range.getFrom selection)
+                                                        (d.text)
+                                                    )
+                                    in
+                                    Model
+                                        { d
+                                            | predictions =
+                                                Open e newPredData
+                                        }
+
+                                Nothing ->
+                                    Model d
+
+                        _ ->
+                            Model d
+                else
+                    Model d
+            )
+
+        Nothing ->
+            Model d
+    )
+        |> noCmd

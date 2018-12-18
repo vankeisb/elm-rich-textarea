@@ -58,6 +58,24 @@
         }
     }
 
+    // wire prediction ports
+    app.ports.predict.subscribe(predictRequest => {
+        app.ports.onPredictResponse.send({
+            id: predictRequest.id,
+            predictions: [
+                "stuff",
+                "more",
+                "things",
+                "blah",
+                "foo",
+                "bar",
+                "baz",
+                "merry",
+                "xmas"
+            ]
+        });
+    });
+
 
 
 </script>

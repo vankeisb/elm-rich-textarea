@@ -130,12 +130,19 @@ suite =
         ]
 
 
+config: Config MyStyle () Msg
+config =
+    { lift = TextareaMsg
+    , highlighter = emptyHighlighter
+    , predictionConfig = Nothing
+    }
 
-update : IT.Msg -> Model MyStyle -> Model MyStyle
+
+update : IT.Msg -> Model MyStyle () -> Model MyStyle ()
 update msg model =
     let
         (m,_,_) =
-            Textarea.update msg model
+            Textarea.update config msg model
     in
     m
 
@@ -167,7 +174,7 @@ renderer myStyles =
             []
 
 
-createModel : String -> Model MyStyle
+createModel : String -> Model MyStyle ()
 createModel str =
     Textarea.init
         { idPrefix = "test-ta"
@@ -178,7 +185,7 @@ createModel str =
 
 
 
-withSelection : Range -> Model s -> Model s
+withSelection : Range -> Model s () -> Model s ()
 withSelection range (IT.Model d) =
     IT.Model
         { d
@@ -186,7 +193,7 @@ withSelection range (IT.Model d) =
         }
 
 
-whileSelectingAt : Int -> Model s -> Model s
+whileSelectingAt : Int -> Model s () -> Model s ()
 whileSelectingAt at (IT.Model d) =
     IT.Model
         { d
@@ -194,11 +201,10 @@ whileSelectingAt at (IT.Model d) =
         }
 
 
-renderHtml : Model MyStyle -> Single Msg
+renderHtml : Model MyStyle () -> Single Msg
 renderHtml m =
     Textarea.view
-        TextareaMsg
-        renderer
+        config
         m
         |> fromHtml
 
@@ -262,11 +268,11 @@ updateSuite =
         ]
 
 
-getSelection : Model s -> Maybe Range
+getSelection : Model s () -> Maybe Range
 getSelection (IT.Model d) =
     .selection d
 
 
-getSelectingAt : Model s -> Maybe Int
+getSelectingAt : Model s () -> Maybe Int
 getSelectingAt (IT.Model d) =
     .selectingAt d

@@ -1,12 +1,13 @@
 module Internal.Textarea exposing
     ( Box
-    , HighlightId
+    , Uuid
     , Model(..)
     , ModelData
     , Msg(..)
-    , encodeHighlightId
-    , highlightIdDecoder
-    , initialHighlightId
+    , encodeUuid
+    , nextUuid
+    , uuidDecoder
+    , initialUuid
     , lineSize
     )
 
@@ -14,6 +15,7 @@ import Array
 import Browser.Dom as Dom
 import Debounce
 import Internal.Styles exposing (StyledText, Styles)
+import Internal.Predictions exposing (Predictions)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Range exposing (Range)
@@ -21,8 +23,8 @@ import Range exposing (Range)
 
 type Msg
     = OnInput String Int Int
-    | OnKeyDown Int Int Int
-    | OnKeyUp Int Int Int
+    | OnKeyDown Int Bool Int Int
+    | OnKeyUp Int Bool Int Int
     | MouseDown Int
     | MouseUp Int
     | MouseOver Int
@@ -43,19 +45,27 @@ type Msg
     | Scrolled Float Float
     | DebounceMsg Debounce.Msg
     | TriggerHighlight
+    | GetPredictionCharViewport (Result Dom.Error Dom.Element)
+    | PredictionClicked Int
     | NoOp
 
 
-type HighlightId
-    = HighlightId Int
+type Uuid
+    = Uuid Int
 
 
-initialHighlightId : HighlightId
-initialHighlightId =
-    HighlightId 0
+initialUuid : Uuid
+initialUuid =
+    Uuid 0
 
 
-type alias ModelData s =
+nextUuid: Uuid -> Uuid
+nextUuid (Uuid i) =
+    Uuid (i + 1)
+
+
+
+type alias ModelData s p =
     { idPrefix : String
     , text : String
     , selection : Maybe Range
@@ -64,9 +74,11 @@ type alias ModelData s =
     , focused : Bool
     , viewportBox : Box
     , selectingAt : Maybe Int
-    , highlightId : HighlightId
-    , debounce : Debounce.Debounce HighlightId
+    , highlightId : Uuid
+    , debounce : Debounce.Debounce Uuid
     , debounceMs : Float
+    , predictions: Predictions p
+    , predictionId: Uuid
     }
 
 
@@ -80,8 +92,8 @@ type alias Box =
     }
 
 
-type Model s
-    = Model (ModelData s)
+type Model s p
+    = Model (ModelData s p)
 
 
 lineSize : Int -> String -> Maybe Int
@@ -102,11 +114,11 @@ lineSize n text =
         |> Array.get n
 
 
-encodeHighlightId : HighlightId -> Encode.Value
-encodeHighlightId (HighlightId id) =
+encodeUuid : Uuid -> Encode.Value
+encodeUuid (Uuid id) =
     Encode.int id
 
 
-highlightIdDecoder : Decode.Decoder HighlightId
-highlightIdDecoder =
-    Decode.map HighlightId Decode.int
+uuidDecoder : Decode.Decoder Uuid
+uuidDecoder =
+    Decode.map Uuid Decode.int
