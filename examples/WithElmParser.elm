@@ -64,12 +64,18 @@ config =
 view : Model -> Html Msg
 view model =
     div
-        [ style "width" "400px"
-        , style "height" "200px"
-        , style "position" "relative"
-        , style "border" "1px solid lightgray"
-        ]
-        [ Textarea.view config model.textareaModel
+        []
+        [ h2
+            []
+            [ text "Elm highlight, no predictions"]
+        , div
+            [ style "width" "400px"
+            , style "height" "200px"
+            , style "position" "relative"
+            , style "border" "1px solid lightgray"
+            ]
+            [ Textarea.view config model.textareaModel
+            ]
         ]
 
 

@@ -79,12 +79,24 @@ config =
 view : Model -> Html Msg
 view model =
     div
-        [ style "width" "400px"
-        , style "height" "200px"
-        , style "position" "relative"
-        , style "border" "1px solid lightgray"
-        ]
-        [ Textarea.view config model.textareaModel
+        []
+        [ h2
+            []
+            [ text "Highlighting/Predictions in JS"]
+        , div
+            [ style "width" "400px"
+            , style "height" "200px"
+            , style "position" "relative"
+            , style "border" "1px solid lightgray"
+            ]
+            [ Textarea.view config model.textareaModel
+            ]
+        , p
+            []
+            [ text "Type "
+            , code [] [ text "CTRL+SPACE" ]
+            , text " to trigger prediction menu."
+            ]
         ]
 
 
