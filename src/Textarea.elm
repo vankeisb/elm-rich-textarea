@@ -480,11 +480,16 @@ update msg (Model model) =
                     | text = s
                     , styles =
                         let
+                            prevStart =
+                                model.selection
+                                    |> Maybe.map Range.getFrom
+                                    |> Maybe.withDefault start
+
                             inserted =
-                                String.length s - String.length model.text
+                                start - prevStart
                         in
                         if start == end && inserted /= 0 then
-                            S.insertAt start inserted model.styles
+                            S.insertAt prevStart inserted model.styles
 
                         else
                             model.styles
@@ -875,6 +880,9 @@ expandLineSelection =
 onKey : Bool -> Int -> Int -> Int -> ModelData s -> ( Model s, Cmd Msg, Maybe OutMsg )
 onKey isDown keyCode start end d =
     let
+        x =
+            Debug.log "startOnKey" start
+
         ( newText, newSel ) =
             if keyCode == 9 && not isDown then
                 -- TAB: insert spaces
