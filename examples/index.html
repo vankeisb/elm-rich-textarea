@@ -16,7 +16,7 @@
 <script>
     const app = Elm.Main.init({node: document.getElementById("app")});
 
-    // wire parsing ports !
+    // wire parsing ports
     app.ports.highlight.subscribe(highlightRequest => {
         const styles = highlight(highlightRequest.text);
         app.ports.onHighlightResponse.send({
@@ -63,13 +63,15 @@
         app.ports.onPredictResponse.send({
             id: predictRequest.id,
             predictions: [
+                "let",
+                "in",
+                "foo",
+                "bar",
+                "baz",
                 "stuff",
                 "more",
                 "things",
                 "blah",
-                "foo",
-                "bar",
-                "baz",
                 "merry",
                 "xmas"
             ]
