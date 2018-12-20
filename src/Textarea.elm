@@ -554,7 +554,12 @@ renderStyledText m lift highlighter st =
 
                           else
                             text ""
-                        , text (String.fromChar c)
+                        , text <|
+                            case c of
+                                '\n' ->
+                                    " "
+                                _ ->
+                                    String.fromChar c
                         ]
                 )
         )

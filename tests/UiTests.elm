@@ -216,7 +216,7 @@ hasCaretAt pos =
         , containing
             [ class "blinking-cursor" ]
         , containing
-            [ text "\n" ]
+            [ text " " ]
         ]
 
 
