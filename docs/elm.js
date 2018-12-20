@@ -4880,6 +4880,7 @@ var author$project$Textarea$defaultInitData = F2(
 	function (idPrefix, initialText) {
 		return {debounceMs: 200, idPrefix: idPrefix, initialText: initialText};
 	});
+var author$project$Internal$Predictions$Closed = {$: 'Closed'};
 var author$project$Internal$Styles$Styles = function (a) {
 	return {$: 'Styles', a: a};
 };
@@ -4970,10 +4971,10 @@ var author$project$Internal$Styles$empty = author$project$Internal$Styles$Styles
 var author$project$Internal$Textarea$Model = function (a) {
 	return {$: 'Model', a: a};
 };
-var author$project$Internal$Textarea$HighlightId = function (a) {
-	return {$: 'HighlightId', a: a};
+var author$project$Internal$Textarea$Uuid = function (a) {
+	return {$: 'Uuid', a: a};
 };
-var author$project$Internal$Textarea$initialHighlightId = author$project$Internal$Textarea$HighlightId(0);
+var author$project$Internal$Textarea$initialUuid = author$project$Internal$Textarea$Uuid(0);
 var elm$core$Basics$apL = F2(
 	function (f, x) {
 		return f(x);
@@ -9849,8 +9850,10 @@ var author$project$Textarea$init = function (initData) {
 		debounce: jinjor$elm_debounce$Debounce$init,
 		debounceMs: initData.debounceMs,
 		focused: false,
-		highlightId: author$project$Internal$Textarea$initialHighlightId,
+		highlightId: author$project$Internal$Textarea$initialUuid,
 		idPrefix: initData.idPrefix,
+		predictionId: author$project$Internal$Textarea$initialUuid,
+		predictions: author$project$Internal$Predictions$Closed,
 		selectingAt: elm$core$Maybe$Nothing,
 		selection: elm$core$Maybe$Nothing,
 		styledTexts: _List_Nil,
@@ -9863,7 +9866,7 @@ var author$project$Textarea$init = function (initData) {
 			author$project$Textarea$computeStyledTexts(
 				A3(
 					author$project$Textarea$applyStyles,
-					author$project$Internal$Textarea$initialHighlightId,
+					author$project$Internal$Textarea$initialUuid,
 					_List_Nil,
 					author$project$Internal$Textarea$Model(initialModelData))),
 			author$project$Textarea$triggerHighlightNow));
@@ -9872,9 +9875,8 @@ var author$project$WithElmParser$TextareaMsg = function (a) {
 	return {$: 'TextareaMsg', a: a};
 };
 var author$project$WithElmParser$init = function (idPrefix) {
-	var initialText = 'let\n  foo = 1\nin\n  foo + bar';
 	var _n0 = author$project$Textarea$init(
-		A2(author$project$Textarea$defaultInitData, idPrefix, initialText));
+		A2(author$project$Textarea$defaultInitData, idPrefix, 'let\n  foo = 1\nin\n  foo + bar'));
 	var m = _n0.a;
 	var c = _n0.b;
 	return _Utils_Tuple2(
@@ -9885,13 +9887,12 @@ var author$project$WithPorts$TextareaMsg = function (a) {
 	return {$: 'TextareaMsg', a: a};
 };
 var author$project$WithPorts$init = function (idPrefix) {
-	var initialText = 'let\n  foo = 1\nin\n  foo + bar';
 	var _n0 = author$project$Textarea$init(
-		A2(author$project$Textarea$defaultInitData, idPrefix, initialText));
+		A2(author$project$Textarea$defaultInitData, idPrefix, 'let\n  foo = 1\nin\n  foo + bar'));
 	var m = _n0.a;
 	var c = _n0.b;
 	return _Utils_Tuple2(
-		{textareaModel: m},
+		{blah: '', textareaModel: m},
 		A2(elm$core$Platform$Cmd$map, author$project$WithPorts$TextareaMsg, c));
 };
 var author$project$Main$init = function () {
@@ -9929,7 +9930,11 @@ var author$project$WithElmParser$subscriptions = function (model) {
 var author$project$WithPorts$OnParseResult = function (a) {
 	return {$: 'OnParseResult', a: a};
 };
+var author$project$WithPorts$OnPredictResult = function (a) {
+	return {$: 'OnPredictResult', a: a};
+};
 var author$project$WithPorts$onHighlightResponse = _Platform_incomingPort('onHighlightResponse', elm$json$Json$Decode$value);
+var author$project$WithPorts$onPredictResponse = _Platform_incomingPort('onPredictResponse', elm$json$Json$Decode$value);
 var author$project$WithPorts$subscriptions = function (model) {
 	return elm$core$Platform$Sub$batch(
 		_List_fromArray(
@@ -9938,7 +9943,8 @@ var author$project$WithPorts$subscriptions = function (model) {
 				elm$core$Platform$Sub$map,
 				author$project$WithPorts$TextareaMsg,
 				author$project$Textarea$subscriptions(model.textareaModel)),
-				author$project$WithPorts$onHighlightResponse(author$project$WithPorts$OnParseResult)
+				author$project$WithPorts$onHighlightResponse(author$project$WithPorts$OnParseResult),
+				author$project$WithPorts$onPredictResponse(author$project$WithPorts$OnPredictResult)
 			]));
 };
 var author$project$Main$subscriptions = function (model) {
@@ -9955,6 +9961,98 @@ var author$project$Main$subscriptions = function (model) {
 				author$project$WithPorts$subscriptions(model.portsModel))
 			]));
 };
+var author$project$Internal$Predictions$Loading = function (a) {
+	return {$: 'Loading', a: a};
+};
+var author$project$Internal$Predictions$getSelected = function (_n0) {
+	var pd = _n0.a;
+	return pd.selected;
+};
+var author$project$Internal$Predictions$Open = F2(
+	function (a, b) {
+		return {$: 'Open', a: a, b: b};
+	});
+var author$project$Internal$Predictions$PredictionsData = function (a) {
+	return {$: 'PredictionsData', a: a};
+};
+var elm$core$Maybe$map = F2(
+	function (f, maybe) {
+		if (maybe.$ === 'Just') {
+			var value = maybe.a;
+			return elm$core$Maybe$Just(
+				f(value));
+		} else {
+			return elm$core$Maybe$Nothing;
+		}
+	});
+var author$project$Internal$Predictions$toList = function (_n0) {
+	var d = _n0.a;
+	return _Utils_ap(
+		d.start,
+		_Utils_ap(
+			A2(
+				elm$core$Maybe$withDefault,
+				_List_Nil,
+				A2(
+					elm$core$Maybe$map,
+					function (p) {
+						return _List_fromArray(
+							[p]);
+					},
+					d.selected)),
+			d.end));
+};
+var author$project$Internal$Predictions$setSelected = F2(
+	function (p, preds) {
+		if (preds.$ === 'Open') {
+			var e = preds.a;
+			var pdata = preds.b;
+			var _n1 = pdata;
+			var pd = _n1.a;
+			var _n2 = A3(
+				elm$core$List$foldl,
+				F2(
+					function (pred, _n3) {
+						var st = _n3.a;
+						var sl = _n3.b;
+						var ed = _n3.c;
+						if (sl.$ === 'Just') {
+							return _Utils_Tuple3(
+								st,
+								sl,
+								_Utils_ap(
+									ed,
+									_List_fromArray(
+										[pred])));
+						} else {
+							return _Utils_eq(pred, p) ? _Utils_Tuple3(
+								st,
+								elm$core$Maybe$Just(pred),
+								_List_Nil) : _Utils_Tuple3(
+								_Utils_ap(
+									st,
+									_List_fromArray(
+										[pred])),
+								elm$core$Maybe$Nothing,
+								_List_Nil);
+						}
+					}),
+				_Utils_Tuple3(_List_Nil, elm$core$Maybe$Nothing, _List_Nil),
+				author$project$Internal$Predictions$toList(pdata));
+			var start = _n2.a;
+			var sel = _n2.b;
+			var end = _n2.c;
+			return A2(
+				author$project$Internal$Predictions$Open,
+				e,
+				author$project$Internal$Predictions$PredictionsData(
+					_Utils_update(
+						pd,
+						{end: end, selected: sel, start: start})));
+		} else {
+			return preds;
+		}
+	});
 var author$project$Range$empty = function (_n0) {
 	var from = _n0.a;
 	var to = _n0.b;
@@ -10028,8 +10126,19 @@ var author$project$Internal$Textarea$lineSize = F2(
 						elm$core$String$length,
 						A2(elm$core$String$split, '\n', text))).b));
 	});
+var author$project$Internal$Textarea$nextUuid = function (_n0) {
+	var i = _n0.a;
+	return author$project$Internal$Textarea$Uuid(i + 1);
+};
+var author$project$Range$getFrom = function (_n0) {
+	var from = _n0.a;
+	return from;
+};
 var author$project$Textarea$RequestHighlight = function (a) {
 	return {$: 'RequestHighlight', a: a};
+};
+var author$project$Textarea$RequestPrediction = function (a) {
+	return {$: 'RequestPrediction', a: a};
 };
 var author$project$Internal$Textarea$DebounceMsg = function (a) {
 	return {$: 'DebounceMsg', a: a};
@@ -10062,16 +10171,6 @@ var author$project$TextUtil$candidatePosition = F2(
 		var c = _n0.b;
 		return pred(
 			_Utils_Tuple2(i, c)) ? elm$core$Maybe$Just(i) : elm$core$Maybe$Nothing;
-	});
-var elm$core$Maybe$map = F2(
-	function (f, maybe) {
-		if (maybe.$ === 'Just') {
-			var value = maybe.a;
-			return elm$core$Maybe$Just(
-				f(value));
-		} else {
-			return elm$core$Maybe$Nothing;
-		}
 	});
 var author$project$TextUtil$maybeOrElse = F2(
 	function (recover, maybe) {
@@ -10197,6 +10296,82 @@ var author$project$Textarea$getViewportSize = function (_n0) {
 						author$project$Textarea$viewportId(d)))
 				])));
 };
+var elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return elm$core$Maybe$Just(x);
+	} else {
+		return elm$core$Maybe$Nothing;
+	}
+};
+var author$project$Textarea$getPrefixUntilSpace = F2(
+	function (caretPos, text) {
+		return A2(
+			elm$core$Maybe$withDefault,
+			'',
+			elm$core$List$head(
+				elm$core$List$reverse(
+					A2(
+						elm$core$String$split,
+						' ',
+						A2(
+							elm$core$Maybe$withDefault,
+							'',
+							elm$core$List$head(
+								elm$core$List$reverse(
+									A2(
+										elm$core$String$split,
+										'\n',
+										A3(elm$core$String$slice, 0, caretPos, text)))))))));
+	});
+var elm$core$Debug$log = _Debug_log;
+var author$project$Textarea$insertPrediction = F6(
+	function (predictionConfig, pred, appendSpaceAtEnd, pd, pos, _n0) {
+		var d = _n0.a.a;
+		var cmd = _n0.b;
+		var textToInsert = function () {
+			var prefix = A2(author$project$Textarea$getPrefixUntilSpace, pos, d.text);
+			var predText = predictionConfig.text(pred);
+			var rest = A3(
+				elm$core$String$slice,
+				elm$core$String$length(prefix),
+				elm$core$String$length(predText),
+				predText);
+			return appendSpaceAtEnd ? (rest + ' ') : rest;
+		}();
+		var right = A2(
+			elm$core$Debug$log,
+			'right',
+			A3(
+				elm$core$String$slice,
+				pos,
+				elm$core$String$length(d.text),
+				d.text));
+		var newCaretPos = pos + elm$core$String$length(textToInsert);
+		var left = A2(
+			elm$core$Debug$log,
+			'left',
+			A3(elm$core$String$slice, 0, pos, d.text));
+		return _Utils_Tuple2(
+			author$project$Internal$Textarea$Model(
+				_Utils_update(
+					d,
+					{
+						predictions: author$project$Internal$Predictions$Closed,
+						selection: elm$core$Maybe$Just(
+							A2(author$project$Range$range, newCaretPos, newCaretPos)),
+						text: A2(
+							elm$core$Debug$log,
+							'newText',
+							_Utils_ap(
+								left,
+								_Utils_ap(textToInsert, right)))
+					})),
+			elm$core$Platform$Cmd$batch(
+				_List_fromArray(
+					[cmd, author$project$Textarea$triggerHighlightNow])));
+	});
 var author$project$Textarea$noCmd = function (m) {
 	return _Utils_Tuple2(m, elm$core$Platform$Cmd$none);
 };
@@ -10217,6 +10392,310 @@ var author$project$Range$move = F2(
 		var from = _n0.a;
 		var to = _n0.b;
 		return A2(author$project$Range$Range, from + i, to + i);
+	});
+var author$project$Internal$Predictions$selectFirst = function (_n0) {
+	var d = _n0.a;
+	var _n1 = d.start;
+	if (_n1.b) {
+		var p = _n1.a;
+		var ps = _n1.b;
+		return author$project$Internal$Predictions$PredictionsData(
+			_Utils_update(
+				d,
+				{
+					end: _Utils_ap(
+						ps,
+						_Utils_ap(
+							A2(
+								elm$core$Maybe$withDefault,
+								_List_Nil,
+								A2(
+									elm$core$Maybe$map,
+									function (pred) {
+										return _List_fromArray(
+											[pred]);
+									},
+									d.selected)),
+							d.end)),
+					selected: elm$core$Maybe$Just(p),
+					start: _List_Nil
+				}));
+	} else {
+		return author$project$Internal$Predictions$PredictionsData(d);
+	}
+};
+var author$project$Internal$Predictions$applyFilter = F3(
+	function (predictionText, filterString, _n0) {
+		var pd = _n0.a;
+		var previouslySelectedText = A2(elm$core$Maybe$map, predictionText, pd.selected);
+		var preds = pd.allItems;
+		var filtered = A2(
+			elm$core$List$filter,
+			function (p) {
+				return A2(
+					elm$core$String$startsWith,
+					filterString,
+					predictionText(p));
+			},
+			pd.allItems);
+		var _n1 = A3(
+			elm$core$List$foldl,
+			F2(
+				function (pred, _n2) {
+					var st = _n2.a;
+					var sl = _n2.b;
+					var ed = _n2.c;
+					if (sl.$ === 'Just') {
+						return _Utils_Tuple3(
+							st,
+							sl,
+							_Utils_ap(
+								ed,
+								_List_fromArray(
+									[pred])));
+					} else {
+						return _Utils_eq(
+							previouslySelectedText,
+							elm$core$Maybe$Just(
+								predictionText(pred))) ? _Utils_Tuple3(
+							st,
+							elm$core$Maybe$Just(pred),
+							_List_Nil) : _Utils_Tuple3(
+							_Utils_ap(
+								st,
+								_List_fromArray(
+									[pred])),
+							elm$core$Maybe$Nothing,
+							_List_Nil);
+					}
+				}),
+			_Utils_Tuple3(_List_Nil, elm$core$Maybe$Nothing, _List_Nil),
+			filtered);
+		var start = _n1.a;
+		var sel = _n1.b;
+		var end = _n1.c;
+		var newPd = author$project$Internal$Predictions$PredictionsData(
+			_Utils_update(
+				pd,
+				{end: end, selected: sel, start: start}));
+		return _Utils_eq(sel, elm$core$Maybe$Nothing) ? author$project$Internal$Predictions$selectFirst(newPd) : newPd;
+	});
+var author$project$Internal$Predictions$getInitialCaretPos = function (_n0) {
+	var pd = _n0.a;
+	return pd.initialCaretPos;
+};
+var elm$core$List$tail = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return elm$core$Maybe$Just(xs);
+	} else {
+		return elm$core$Maybe$Nothing;
+	}
+};
+var author$project$Internal$Predictions$moveDown = function (_n0) {
+	var d = _n0.a;
+	return author$project$Internal$Predictions$PredictionsData(
+		function () {
+			if (elm$core$List$isEmpty(d.end)) {
+				return d;
+			} else {
+				var _n1 = d.selected;
+				if (_n1.$ === 'Just') {
+					var selected = _n1.a;
+					return _Utils_update(
+						d,
+						{
+							end: A2(
+								elm$core$Maybe$withDefault,
+								_List_Nil,
+								elm$core$List$tail(d.end)),
+							selected: elm$core$List$head(d.end),
+							start: _Utils_ap(
+								d.start,
+								_List_fromArray(
+									[selected]))
+						});
+				} else {
+					return d;
+				}
+			}
+		}());
+};
+var author$project$Internal$Predictions$moveUp = function (_n0) {
+	var d = _n0.a;
+	return author$project$Internal$Predictions$PredictionsData(
+		function () {
+			if (elm$core$List$isEmpty(d.start)) {
+				return d;
+			} else {
+				var _n1 = d.selected;
+				if (_n1.$ === 'Just') {
+					var selected = _n1.a;
+					return _Utils_update(
+						d,
+						{
+							end: A2(elm$core$List$cons, selected, d.end),
+							selected: elm$core$List$head(
+								elm$core$List$reverse(d.start)),
+							start: elm$core$List$reverse(
+								A2(
+									elm$core$Maybe$withDefault,
+									_List_Nil,
+									elm$core$List$tail(
+										elm$core$List$reverse(d.start))))
+						});
+				} else {
+					return d;
+				}
+			}
+		}());
+};
+var author$project$Internal$Textarea$GetPredictionCharViewport = function (a) {
+	return {$: 'GetPredictionCharViewport', a: a};
+};
+var author$project$Textarea$charId = F2(
+	function (d, i) {
+		return d.idPrefix + ('-char-' + elm$core$String$fromInt(i));
+	});
+var author$project$Textarea$handlePredictionsNav = F7(
+	function (config, isDown, keyCode, ctrlKey, start, end, _n0) {
+		var d = _n0.a.a;
+		var cmd = _n0.b;
+		var withCmd = F2(
+			function (c, m) {
+				return _Utils_Tuple2(
+					m,
+					elm$core$Platform$Cmd$batch(
+						_List_fromArray(
+							[cmd, c])));
+			});
+		var setPredictions = function (newPreds) {
+			return author$project$Internal$Textarea$Model(
+				_Utils_update(
+					d,
+					{predictions: newPreds}));
+		};
+		var isPredictionTrigger = (keyCode === 32) && (ctrlKey && isDown);
+		var escapeKey = keyCode === 27;
+		var _n1 = config.predictionConfig;
+		if (_n1.$ === 'Nothing') {
+			return _Utils_Tuple2(
+				author$project$Internal$Textarea$Model(d),
+				cmd);
+		} else {
+			var predictionConfig = _n1.a;
+			var _n2 = d.predictions;
+			switch (_n2.$) {
+				case 'Closed':
+					return A2(
+						withCmd,
+						isPredictionTrigger ? A2(
+							elm$core$Task$attempt,
+							author$project$Internal$Textarea$GetPredictionCharViewport,
+							elm$browser$Browser$Dom$getElement(
+								A2(author$project$Textarea$charId, d, start))) : elm$core$Platform$Cmd$none,
+						author$project$Internal$Textarea$Model(d));
+				case 'Loading':
+					return escapeKey ? A2(
+						withCmd,
+						elm$core$Platform$Cmd$none,
+						setPredictions(author$project$Internal$Predictions$Closed)) : A2(
+						withCmd,
+						elm$core$Platform$Cmd$none,
+						author$project$Internal$Textarea$Model(d));
+				default:
+					var e = _n2.a;
+					var pd = _n2.b;
+					if ((keyCode === 38) && isDown) {
+						return A2(
+							withCmd,
+							elm$core$Platform$Cmd$none,
+							setPredictions(
+								A2(
+									author$project$Internal$Predictions$Open,
+									e,
+									author$project$Internal$Predictions$moveUp(pd))));
+					} else {
+						if ((keyCode === 40) && isDown) {
+							return A2(
+								withCmd,
+								elm$core$Platform$Cmd$none,
+								setPredictions(
+									A2(
+										author$project$Internal$Predictions$Open,
+										e,
+										author$project$Internal$Predictions$moveDown(pd))));
+						} else {
+							if ((keyCode === 27) && isDown) {
+								return A2(
+									withCmd,
+									elm$core$Platform$Cmd$none,
+									setPredictions(author$project$Internal$Predictions$Closed));
+							} else {
+								if (((keyCode === 13) || ((keyCode === 32) || (keyCode === 9))) && isDown) {
+									var _n3 = author$project$Internal$Predictions$getSelected(pd);
+									if (_n3.$ === 'Just') {
+										var selPred = _n3.a;
+										return A6(
+											author$project$Textarea$insertPrediction,
+											predictionConfig,
+											selPred,
+											(keyCode === 32) || (keyCode === 9),
+											pd,
+											start,
+											_Utils_Tuple2(
+												author$project$Internal$Textarea$Model(d),
+												cmd));
+									} else {
+										return _Utils_Tuple2(
+											author$project$Internal$Textarea$Model(d),
+											cmd);
+									}
+								} else {
+									if (!isDown) {
+										var _n4 = d.selection;
+										if (_n4.$ === 'Just') {
+											var selection = _n4.a;
+											var initialCaretPos = author$project$Internal$Predictions$getInitialCaretPos(pd);
+											var currentCaretPos = author$project$Range$getFrom(selection);
+											var delta = currentCaretPos - initialCaretPos;
+											if (delta < 0) {
+												return A2(
+													withCmd,
+													elm$core$Platform$Cmd$none,
+													setPredictions(author$project$Internal$Predictions$Closed));
+											} else {
+												var str = A3(elm$core$String$slice, initialCaretPos, currentCaretPos, d.text);
+												var prefix = A2(author$project$Textarea$getPrefixUntilSpace, initialCaretPos, d.text);
+												var filter = _Utils_ap(prefix, str);
+												return A2(
+													withCmd,
+													elm$core$Platform$Cmd$none,
+													setPredictions(
+														A2(
+															author$project$Internal$Predictions$Open,
+															e,
+															A3(author$project$Internal$Predictions$applyFilter, predictionConfig.text, filter, pd))));
+											}
+										} else {
+											return A2(
+												withCmd,
+												elm$core$Platform$Cmd$none,
+												author$project$Internal$Textarea$Model(d));
+										}
+									} else {
+										return A2(
+											withCmd,
+											elm$core$Platform$Cmd$none,
+											author$project$Internal$Textarea$Model(d));
+									}
+								}
+							}
+						}
+					}
+			}
+		}
 	});
 var jinjor$elm_debounce$Debounce$Flush = function (a) {
 	return {$: 'Flush', a: a};
@@ -10292,7 +10771,10 @@ var author$project$Textarea$requestHighlight = function (_n0) {
 			author$project$Internal$Textarea$Model(
 				_Utils_update(
 					model,
-					{debounce: debounce})),
+					{
+						debounce: debounce,
+						highlightId: author$project$Internal$Textarea$nextUuid(model.highlightId)
+					})),
 			elm$core$Platform$Cmd$batch(
 				_List_fromArray(
 					[cmd, debounceCmd]))));
@@ -10300,14 +10782,6 @@ var author$project$Textarea$requestHighlight = function (_n0) {
 var author$project$Internal$Textarea$GetCharViewport = function (a) {
 	return {$: 'GetCharViewport', a: a};
 };
-var author$project$Range$getFrom = function (_n0) {
-	var from = _n0.a;
-	return from;
-};
-var author$project$Textarea$charId = F2(
-	function (d, i) {
-		return d.idPrefix + ('-char-' + elm$core$String$fromInt(i));
-	});
 var author$project$Textarea$scrollCaretIntoView = F2(
 	function (prevRange, _n0) {
 		var d = _n0.a.a;
@@ -10364,8 +10838,9 @@ var author$project$Textarea$setSelection = F2(
 						{selection: r})),
 				c));
 	});
-var author$project$Textarea$onKey = F5(
-	function (isDown, keyCode, start, end, d) {
+var author$project$Textarea$onKey = F7(
+	function (config, isDown, keyCode, ctrlKey, start, end, d) {
+		var x = A2(elm$core$Debug$log, 'startOnKey', start);
 		var _n0 = ((keyCode === 9) && (!isDown)) ? A2(
 			elm$core$Maybe$withDefault,
 			_Utils_Tuple2(d.text, d.selection),
@@ -10393,16 +10868,25 @@ var author$project$Textarea$onKey = F5(
 		var newText = _n0.a;
 		var newSel = _n0.b;
 		return author$project$Textarea$requestHighlight(
-			A2(
-				author$project$Textarea$setSelection,
-				newSel,
-				author$project$Textarea$getViewportPos(
-					author$project$Textarea$noCmd(
-						author$project$Textarea$computeStyledTexts(
-							author$project$Internal$Textarea$Model(
-								_Utils_update(
-									d,
-									{text: newText})))))));
+			A7(
+				author$project$Textarea$handlePredictionsNav,
+				config,
+				isDown,
+				keyCode,
+				ctrlKey,
+				start,
+				end,
+				A2(
+					author$project$Textarea$setSelection,
+					newSel,
+					author$project$Textarea$getViewportPos(
+						_Utils_Tuple2(
+							author$project$Textarea$computeStyledTexts(
+								author$project$Internal$Textarea$Model(
+									_Utils_update(
+										d,
+										{text: newText}))),
+							elm$core$Platform$Cmd$none)))));
 	});
 var author$project$Internal$Textarea$Focused = function (a) {
 	return {$: 'Focused', a: a};
@@ -10539,8 +11023,8 @@ var jinjor$elm_debounce$Debounce$update = F4(
 				}
 		}
 	});
-var author$project$Textarea$update = F2(
-	function (msg, _n0) {
+var author$project$Textarea$update = F3(
+	function (config, msg, _n0) {
 		var model = _n0.a;
 		switch (msg.$) {
 			case 'OnInput':
@@ -10559,21 +11043,27 @@ var author$project$Textarea$update = F2(
 										model,
 										{
 											styles: function () {
-												var inserted = elm$core$String$length(s) - elm$core$String$length(model.text);
-												return (_Utils_eq(start, end) && inserted) ? A3(author$project$Internal$Styles$insertAt, start, inserted, model.styles) : model.styles;
+												var prevStart = A2(
+													elm$core$Maybe$withDefault,
+													start,
+													A2(elm$core$Maybe$map, author$project$Range$getFrom, model.selection));
+												var inserted = start - prevStart;
+												return (_Utils_eq(start, end) && inserted) ? A3(author$project$Internal$Styles$insertAt, prevStart, inserted, model.styles) : model.styles;
 											}(),
 											text: s
 										}))))));
 			case 'OnKeyDown':
 				var keyCode = msg.a;
-				var start = msg.b;
-				var end = msg.c;
-				return A5(author$project$Textarea$onKey, true, keyCode, start, end, model);
+				var ctrlKey = msg.b;
+				var start = msg.c;
+				var end = msg.d;
+				return A7(author$project$Textarea$onKey, config, true, keyCode, ctrlKey, start, end, model);
 			case 'OnKeyUp':
 				var keyCode = msg.a;
-				var start = msg.b;
-				var end = msg.c;
-				return A5(author$project$Textarea$onKey, false, keyCode, start, end, model);
+				var ctrlKey = msg.b;
+				var start = msg.c;
+				var end = msg.d;
+				return A7(author$project$Textarea$onKey, config, false, keyCode, ctrlKey, start, end, model);
 			case 'MouseDown':
 				var i = msg.a;
 				return author$project$Textarea$noOut(
@@ -10756,7 +11246,7 @@ var author$project$Textarea$update = F2(
 								author$project$Internal$Textarea$Model(
 									_Utils_update(
 										model,
-										{focused: false}))))));
+										{focused: false, predictions: author$project$Internal$Predictions$Closed}))))));
 			case 'GetViewportPos':
 				var element = msg.a;
 				if (element.$ === 'Ok') {
@@ -10879,7 +11369,7 @@ var author$project$Textarea$update = F2(
 								model,
 								{debounce: debounce})),
 						cmd));
-			default:
+			case 'TriggerHighlight':
 				return A2(
 					author$project$Textarea$withOutMsg,
 					elm$core$Maybe$Just(
@@ -10887,8 +11377,121 @@ var author$project$Textarea$update = F2(
 							{id: model.highlightId, text: model.text})),
 					author$project$Textarea$noCmd(
 						author$project$Internal$Textarea$Model(model)));
+			case 'GetPredictionCharViewport':
+				if (msg.a.$ === 'Ok') {
+					var element = msg.a.a;
+					var newPredictionId = author$project$Internal$Textarea$nextUuid(model.predictionId);
+					return _Utils_Tuple3(
+						author$project$Internal$Textarea$Model(
+							_Utils_update(
+								model,
+								{
+									predictionId: newPredictionId,
+									predictions: author$project$Internal$Predictions$Loading(element)
+								})),
+						elm$core$Platform$Cmd$none,
+						A2(
+							elm$core$Maybe$map,
+							function (sel) {
+								return author$project$Textarea$RequestPrediction(
+									{
+										id: newPredictionId,
+										offset: author$project$Range$getFrom(sel),
+										text: model.text
+									});
+							},
+							model.selection));
+				} else {
+					return author$project$Textarea$noOut(
+						author$project$Textarea$noCmd(
+							author$project$Internal$Textarea$Model(model)));
+				}
+			default:
+				var index = msg.a;
+				return author$project$Textarea$noOut(
+					function () {
+						var _n10 = config.predictionConfig;
+						if (_n10.$ === 'Just') {
+							var predictionConfig = _n10.a;
+							var _n11 = model.predictions;
+							if (_n11.$ === 'Open') {
+								var pd = _n11.b;
+								var clickedPred = A2(
+									elm$core$Array$get,
+									index,
+									elm$core$Array$fromList(
+										author$project$Internal$Predictions$toList(pd)));
+								if (clickedPred.$ === 'Just') {
+									var clicked = clickedPred.a;
+									var _n13 = model.selection;
+									if (_n13.$ === 'Just') {
+										var sel = _n13.a;
+										return _Utils_eq(
+											author$project$Internal$Predictions$getSelected(pd),
+											elm$core$Maybe$Just(clicked)) ? A6(
+											author$project$Textarea$insertPrediction,
+											predictionConfig,
+											clicked,
+											false,
+											pd,
+											author$project$Range$getFrom(sel),
+											_Utils_Tuple2(
+												author$project$Internal$Textarea$Model(model),
+												elm$core$Platform$Cmd$none)) : _Utils_Tuple2(
+											author$project$Internal$Textarea$Model(
+												_Utils_update(
+													model,
+													{
+														predictions: A2(author$project$Internal$Predictions$setSelected, clicked, model.predictions)
+													})),
+											elm$core$Platform$Cmd$none);
+									} else {
+										return author$project$Textarea$noCmd(
+											author$project$Internal$Textarea$Model(model));
+									}
+								} else {
+									return author$project$Textarea$noCmd(
+										author$project$Internal$Textarea$Model(model));
+								}
+							} else {
+								return author$project$Textarea$noCmd(
+									author$project$Internal$Textarea$Model(model));
+							}
+						} else {
+							return author$project$Textarea$noCmd(
+								author$project$Internal$Textarea$Model(model));
+						}
+					}());
 		}
 	});
+var author$project$WithElmParser$TextClicked = {$: 'TextClicked'};
+var author$project$WithElmParser$renderer = function (myStyles) {
+	return A3(
+		elm$core$List$foldl,
+		F2(
+			function (myStyle, attrs) {
+				if (myStyle.$ === 'Keyword') {
+					return _Utils_ap(
+						attrs,
+						_List_fromArray(
+							[
+								A2(elm$html$Html$Attributes$style, 'color', 'grey'),
+								A2(elm$html$Html$Attributes$style, 'font-weight', 'bold'),
+								elm$html$Html$Events$onClick(author$project$WithElmParser$TextClicked)
+							]));
+				} else {
+					return _Utils_ap(
+						attrs,
+						_List_fromArray(
+							[
+								A2(elm$html$Html$Attributes$style, 'color', '#C086D0')
+							]));
+				}
+			}),
+		_List_Nil,
+		myStyles);
+};
+var author$project$WithElmParser$config = {highlighter: author$project$WithElmParser$renderer, lift: author$project$WithElmParser$TextareaMsg, predictionConfig: elm$core$Maybe$Nothing};
 var author$project$WithElmParser$Identifier = {$: 'Identifier'};
 var author$project$WithElmParser$Keyword = {$: 'Keyword'};
 var author$project$WithElmParser$highlight = function (text) {
@@ -10930,12 +11533,12 @@ var author$project$WithElmParser$update = F2(
 	function (msg, model) {
 		if (msg.$ === 'TextareaMsg') {
 			var sub = msg.a;
-			var _n1 = A2(author$project$Textarea$update, sub, model.textareaModel);
+			var _n1 = A3(author$project$Textarea$update, author$project$WithElmParser$config, sub, model.textareaModel);
 			var tm = _n1.a;
 			var c = _n1.b;
 			var o = _n1.c;
 			var tm2 = function () {
-				if (o.$ === 'Just') {
+				if ((o.$ === 'Just') && (o.a.$ === 'RequestHighlight')) {
 					var hr = o.a.a;
 					return A3(
 						author$project$Textarea$applyStyles,
@@ -10955,8 +11558,69 @@ var author$project$WithElmParser$update = F2(
 			return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
 		}
 	});
+var author$project$Internal$Predictions$fromList = F2(
+	function (caretPos, ps) {
+		return author$project$Internal$Predictions$selectFirst(
+			author$project$Internal$Predictions$PredictionsData(
+				{
+					allItems: ps,
+					end: A2(
+						elm$core$Maybe$withDefault,
+						_List_Nil,
+						elm$core$List$tail(ps)),
+					initialCaretPos: caretPos,
+					selected: elm$core$List$head(ps),
+					start: _List_Nil
+				}));
+	});
+var author$project$Textarea$applyPredictions = F3(
+	function (config, preds, _n0) {
+		var d = _n0.a;
+		return author$project$Textarea$noCmd(
+			function () {
+				var _n1 = config.predictionConfig;
+				if (_n1.$ === 'Just') {
+					var predictionConfig = _n1.a;
+					if (_Utils_eq(d.predictionId, preds.id)) {
+						var _n2 = d.predictions;
+						if (_n2.$ === 'Loading') {
+							var e = _n2.a;
+							var _n3 = d.selection;
+							if (_n3.$ === 'Just') {
+								var selection = _n3.a;
+								var newPredData = A3(
+									author$project$Internal$Predictions$applyFilter,
+									predictionConfig.text,
+									A2(
+										author$project$Textarea$getPrefixUntilSpace,
+										author$project$Range$getFrom(selection),
+										d.text),
+									A2(
+										author$project$Internal$Predictions$fromList,
+										author$project$Range$getFrom(selection),
+										preds.predictions));
+								return author$project$Internal$Textarea$Model(
+									_Utils_update(
+										d,
+										{
+											predictions: A2(author$project$Internal$Predictions$Open, e, newPredData)
+										}));
+							} else {
+								return author$project$Internal$Textarea$Model(d);
+							}
+						} else {
+							return author$project$Internal$Textarea$Model(d);
+						}
+					} else {
+						return author$project$Internal$Textarea$Model(d);
+					}
+				} else {
+					return author$project$Internal$Textarea$Model(d);
+				}
+			}());
+	});
 var elm$json$Json$Encode$int = _Json_wrap;
-var author$project$Internal$Textarea$encodeHighlightId = function (_n0) {
+var author$project$Internal$Textarea$encodeUuid = function (_n0) {
 	var id = _n0.a;
 	return elm$json$Json$Encode$int(id);
 };
@@ -10966,14 +11630,29 @@ var author$project$Textarea$encodeHighlightRequest = function (r) {
 			[
 				_Utils_Tuple2(
 				'id',
-				author$project$Internal$Textarea$encodeHighlightId(r.id)),
+				author$project$Internal$Textarea$encodeUuid(r.id)),
 				_Utils_Tuple2(
 				'text',
 				elm$json$Json$Encode$string(r.text))
 			]));
 };
+var author$project$Textarea$encodePredictionRequest = function (r) {
+	return elm$json$Json$Encode$object(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				'id',
+				author$project$Internal$Textarea$encodeUuid(r.id)),
+				_Utils_Tuple2(
+				'text',
+				elm$json$Json$Encode$string(r.text)),
+				_Utils_Tuple2(
+				'offset',
+				elm$json$Json$Encode$int(r.offset))
+			]));
+};
 var elm$json$Json$Decode$int = _Json_decodeInt;
-var author$project$Internal$Textarea$highlightIdDecoder = A2(elm$json$Json$Decode$map, author$project$Internal$Textarea$HighlightId, elm$json$Json$Decode$int);
+var author$project$Internal$Textarea$uuidDecoder = A2(elm$json$Json$Decode$map, author$project$Internal$Textarea$Uuid, elm$json$Json$Decode$int);
 var author$project$Textarea$HighlightResponse = F2(
 	function (id, styles) {
 		return {id: id, styles: styles};
@@ -10995,11 +11674,64 @@ var author$project$Textarea$highlightResponseDecoder = function (styleDecoder) {
 	return A3(
 		elm$json$Json$Decode$map2,
 		author$project$Textarea$HighlightResponse,
-		A2(elm$json$Json$Decode$field, 'id', author$project$Internal$Textarea$highlightIdDecoder),
+		A2(elm$json$Json$Decode$field, 'id', author$project$Internal$Textarea$uuidDecoder),
 		A2(
 			elm$json$Json$Decode$field,
 			'styles',
 			elm$json$Json$Decode$list(rangeAndStyleDecoder)));
+};
+var author$project$Textarea$PredictionResponse = F2(
+	function (id, predictions) {
+		return {id: id, predictions: predictions};
+	});
+var author$project$Textarea$predictResponseDecoder = function (predictionDecoder) {
+	return A3(
+		elm$json$Json$Decode$map2,
+		author$project$Textarea$PredictionResponse,
+		A2(elm$json$Json$Decode$field, 'id', author$project$Internal$Textarea$uuidDecoder),
+		A2(
+			elm$json$Json$Decode$field,
+			'predictions',
+			elm$json$Json$Decode$list(predictionDecoder)));
+};
+var author$project$WithPorts$TextClicked = {$: 'TextClicked'};
+var author$project$WithPorts$highlighter = function (myStyles) {
+	return A3(
+		elm$core$List$foldl,
+		F2(
+			function (myStyle, attrs) {
+				if (myStyle.$ === 'Keyword') {
+					return _Utils_ap(
+						attrs,
+						_List_fromArray(
+							[
+								A2(elm$html$Html$Attributes$style, 'color', 'grey'),
+								A2(elm$html$Html$Attributes$style, 'font-weight', 'bold'),
+								elm$html$Html$Events$onClick(author$project$WithPorts$TextClicked)
+							]));
+				} else {
+					return _Utils_ap(
+						attrs,
+						_List_fromArray(
+							[
+								A2(elm$html$Html$Attributes$style, 'color', '#C086D0')
+							]));
+				}
+			}),
+		_List_Nil,
+		myStyles);
+};
+var author$project$WithPorts$config = {
+	highlighter: author$project$WithPorts$highlighter,
+	lift: author$project$WithPorts$TextareaMsg,
+	predictionConfig: elm$core$Maybe$Just(
+		{
+			icon: function (pred) {
+				return ((pred === 'foo') || (pred === 'bar')) ? elm$core$Maybe$Just(
+					elm$html$Html$text('λ')) : elm$core$Maybe$Nothing;
+			},
+			text: elm$core$Basics$identity
+		})
 };
 var author$project$WithPorts$highlight = _Platform_outgoingPort('highlight', elm$core$Basics$identity);
 var author$project$WithPorts$Identifier = {$: 'Identifier'};
@@ -11020,22 +11752,28 @@ var author$project$WithPorts$myStyleDecoder = A2(
 		}
 	},
 	elm$json$Json$Decode$string);
-var elm$core$Debug$log = _Debug_log;
+var author$project$WithPorts$predict = _Platform_outgoingPort('predict', elm$core$Basics$identity);
 var elm$core$Debug$toString = _Debug_toString;
 var author$project$WithPorts$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
 			case 'TextareaMsg':
 				var sub = msg.a;
-				var _n1 = A2(author$project$Textarea$update, sub, model.textareaModel);
+				var _n1 = A3(author$project$Textarea$update, author$project$WithPorts$config, sub, model.textareaModel);
 				var tm = _n1.a;
 				var c = _n1.b;
 				var o = _n1.c;
 				var parseCmd = function () {
 					if (o.$ === 'Just') {
-						var hr = o.a.a;
-						return author$project$WithPorts$highlight(
-							author$project$Textarea$encodeHighlightRequest(hr));
+						if (o.a.$ === 'RequestHighlight') {
+							var hr = o.a.a;
+							return author$project$WithPorts$highlight(
+								author$project$Textarea$encodeHighlightRequest(hr));
+						} else {
+							var pr = o.a.a;
+							return author$project$WithPorts$predict(
+								author$project$Textarea$encodePredictionRequest(pr));
+						}
 					} else {
 						return elm$core$Platform$Cmd$none;
 					}
@@ -11070,6 +11808,31 @@ var author$project$WithPorts$update = F2(
 					var x = A2(
 						elm$core$Debug$log,
 						'failed to decode highlight response',
+						elm$core$Debug$toString(e));
+					return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
+				}
+			case 'OnPredictResult':
+				var v = msg.a;
+				var pr = A2(
+					elm$json$Json$Decode$decodeValue,
+					author$project$Textarea$predictResponseDecoder(elm$json$Json$Decode$string),
+					v);
+				var _n4 = A2(elm$core$Debug$log, 'pr', pr);
+				if (_n4.$ === 'Ok') {
+					var predictResponse = _n4.a;
+					var _n5 = A3(author$project$Textarea$applyPredictions, author$project$WithPorts$config, predictResponse, model.textareaModel);
+					var tm = _n5.a;
+					var tc = _n5.b;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{textareaModel: tm}),
+						A2(elm$core$Platform$Cmd$map, author$project$WithPorts$TextareaMsg, tc));
+				} else {
+					var e = _n4.a;
+					var x = A2(
+						elm$core$Debug$log,
+						'failed to decode prediction response',
 						elm$core$Debug$toString(e));
 					return _Utils_Tuple2(model, elm$core$Platform$Cmd$none);
 				}
@@ -11122,19 +11885,18 @@ var author$project$Internal$Textarea$OnInput = F3(
 	function (a, b, c) {
 		return {$: 'OnInput', a: a, b: b, c: c};
 	});
-var author$project$Internal$Textarea$OnKeyDown = F3(
-	function (a, b, c) {
-		return {$: 'OnKeyDown', a: a, b: b, c: c};
+var author$project$Internal$Textarea$OnKeyDown = F4(
+	function (a, b, c, d) {
+		return {$: 'OnKeyDown', a: a, b: b, c: c, d: d};
 	});
-var author$project$Internal$Textarea$OnKeyUp = F3(
-	function (a, b, c) {
-		return {$: 'OnKeyUp', a: a, b: b, c: c};
+var author$project$Internal$Textarea$OnKeyUp = F4(
+	function (a, b, c, d) {
+		return {$: 'OnKeyUp', a: a, b: b, c: c, d: d};
 	});
 var author$project$Internal$Textarea$Scrolled = F2(
 	function (a, b) {
 		return {$: 'Scrolled', a: a, b: b};
 	});
-var author$project$Textarea$devMode = false;
 var elm$virtual_dom$VirtualDom$Custom = function (a) {
 	return {$: 'Custom', a: a};
 };
@@ -11271,7 +12033,7 @@ var author$project$Textarea$renderStyledText = F4(
 				elm$core$String$fromInt(f));
 		};
 		var charAttrs = function (i) {
-			var _n1 = A2(
+			var _n2 = A2(
 				elm$core$Maybe$withDefault,
 				_Utils_Tuple2(false, false),
 				A2(
@@ -11282,8 +12044,8 @@ var author$project$Textarea$renderStyledText = F4(
 							A2(author$project$Range$isCaret, from + i, r));
 					},
 					selRange));
-			var isSelected = _n1.a;
-			var isCaretLeft = _n1.b;
+			var isSelected = _n2.a;
+			var isCaretLeft = _n2.b;
 			return _Utils_Tuple2(
 				_Utils_ap(
 					_List_fromArray(
@@ -11358,10 +12120,170 @@ var author$project$Textarea$renderStyledText = F4(
 										]),
 									_List_Nil) : elm$html$Html$text(''),
 									elm$html$Html$text(
-									elm$core$String$fromChar(c))
+									function () {
+										if ('\n' === c.valueOf()) {
+											return ' ';
+										} else {
+											return elm$core$String$fromChar(c);
+										}
+									}())
 								]));
 					}),
 				elm$core$String$toList(st.text)));
+	});
+var author$project$Internal$Predictions$isSelected = F2(
+	function (p, _n0) {
+		var d = _n0.a;
+		return _Utils_eq(
+			d.selected,
+			elm$core$Maybe$Just(p));
+	});
+var author$project$Internal$Textarea$PredictionClicked = function (a) {
+	return {$: 'PredictionClicked', a: a};
+};
+var elm$core$Basics$round = _Basics_round;
+var elm$html$Html$table = _VirtualDom_node('table');
+var elm$html$Html$tbody = _VirtualDom_node('tbody');
+var elm$html$Html$td = _VirtualDom_node('td');
+var elm$html$Html$tr = _VirtualDom_node('tr');
+var author$project$Textarea$viewPredictions = F3(
+	function (lift, predConf, d) {
+		var wrap = F2(
+			function (e, h) {
+				return A2(
+					elm$html$Html$div,
+					_List_fromArray(
+						[
+							A2(elm$html$Html$Attributes$style, 'background-color', 'whitesmoke'),
+							A2(elm$html$Html$Attributes$style, 'opacity', '1'),
+							A2(elm$html$Html$Attributes$style, 'padding', '4px'),
+							A2(elm$html$Html$Attributes$style, 'border', '1px solid lightgrey'),
+							A2(elm$html$Html$Attributes$style, 'position', 'absolute'),
+							A2(
+							elm$html$Html$Attributes$style,
+							'left',
+							elm$core$String$fromInt(
+								elm$core$Basics$round(e.element.x - d.viewportBox.x)) + 'px'),
+							A2(
+							elm$html$Html$Attributes$style,
+							'top',
+							elm$core$String$fromInt(
+								elm$core$Basics$round((e.element.y - d.viewportBox.y) + e.element.height)) + 'px')
+						]),
+					_List_fromArray(
+						[h]));
+			});
+		var _n0 = d.predictions;
+		switch (_n0.$) {
+			case 'Closed':
+				return elm$html$Html$text('');
+			case 'Loading':
+				var e = _n0.a;
+				return A2(
+					wrap,
+					e,
+					elm$html$Html$text('Loading...'));
+			default:
+				var e = _n0.a;
+				var predictionsData = _n0.b;
+				var preds = author$project$Internal$Predictions$toList(predictionsData);
+				return elm$core$List$isEmpty(preds) ? A2(
+					wrap,
+					e,
+					elm$html$Html$text('empty !')) : A2(
+					wrap,
+					e,
+					A2(
+						elm$html$Html$table,
+						_List_fromArray(
+							[
+								A2(elm$html$Html$Attributes$style, 'border-spacing', '0')
+							]),
+						_List_fromArray(
+							[
+								A2(
+								elm$html$Html$tbody,
+								_List_Nil,
+								A2(
+									elm$core$List$indexedMap,
+									F2(
+										function (i, pred) {
+											return A2(
+												elm$html$Html$tr,
+												_List_fromArray(
+													[
+														A2(
+														elm$html$Html$Attributes$style,
+														'background-color',
+														A2(author$project$Internal$Predictions$isSelected, pred, predictionsData) ? 'lightblue' : '')
+													]),
+												_List_fromArray(
+													[
+														A2(
+														elm$html$Html$td,
+														_List_fromArray(
+															[
+																A2(
+																elm$html$Html$Events$custom,
+																'mousedown',
+																elm$json$Json$Decode$succeed(
+																	{
+																		message: lift(author$project$Internal$Textarea$NoOp),
+																		preventDefault: true,
+																		stopPropagation: true
+																	})),
+																A2(
+																elm$html$Html$Events$custom,
+																'mouseup',
+																elm$json$Json$Decode$succeed(
+																	{
+																		message: lift(
+																			author$project$Internal$Textarea$PredictionClicked(i)),
+																		preventDefault: true,
+																		stopPropagation: true
+																	}))
+															]),
+														_List_fromArray(
+															[
+																A2(
+																elm$core$Maybe$withDefault,
+																elm$html$Html$text(''),
+																predConf.icon(pred))
+															])),
+														A2(
+														elm$html$Html$td,
+														_List_fromArray(
+															[
+																A2(
+																elm$html$Html$Events$custom,
+																'mousedown',
+																elm$json$Json$Decode$succeed(
+																	{
+																		message: lift(author$project$Internal$Textarea$NoOp),
+																		preventDefault: true,
+																		stopPropagation: true
+																	})),
+																A2(
+																elm$html$Html$Events$custom,
+																'mouseup',
+																elm$json$Json$Decode$succeed(
+																	{
+																		message: lift(
+																			author$project$Internal$Textarea$PredictionClicked(i)),
+																		preventDefault: true,
+																		stopPropagation: true
+																	}))
+															]),
+														_List_fromArray(
+															[
+																elm$html$Html$text(
+																predConf.text(pred))
+															]))
+													]));
+										}),
+									preds))
+							])));
+		}
 	});
 var elm$html$Html$textarea = _VirtualDom_node('textarea');
 var elm$virtual_dom$VirtualDom$property = F2(
@@ -11373,9 +12295,12 @@ var elm$virtual_dom$VirtualDom$property = F2(
 	});
 var elm$html$Html$Attributes$property = elm$virtual_dom$VirtualDom$property;
 var elm$html$Html$Attributes$value = elm$html$Html$Attributes$stringProperty('value');
-var author$project$Textarea$view = F3(
-	function (lift, highlighter, _n0) {
+var elm$json$Json$Decode$bool = _Json_decodeBool;
+var elm$json$Json$Decode$map4 = _Json_map4;
+var author$project$Textarea$view = F2(
+	function (config, _n0) {
 		var d = _n0.a;
+		var lift = config.lift;
 		var lines = A2(
 			elm$core$List$indexedMap,
 			F2(
@@ -11388,28 +12313,29 @@ var author$project$Textarea$view = F3(
 								A2(
 								author$project$Textarea$mouseEvent,
 								'mousedown',
-								function (_n6) {
+								function (_n8) {
 									return lift(
 										author$project$Internal$Textarea$MouseDownLine(lineNumber));
 								}),
 								A2(
 								author$project$Textarea$mouseEvent,
 								'mouseover',
-								function (_n7) {
+								function (_n9) {
 									return lift(
 										author$project$Internal$Textarea$MouseOverLine(lineNumber));
 								}),
 								A2(
 								author$project$Textarea$mouseEvent,
 								'mouseup',
-								function (_n8) {
+								function (_n10) {
 									return lift(
 										author$project$Internal$Textarea$MouseUpLine(lineNumber));
-								})
+								}),
+								A2(elm$html$Html$Attributes$style, 'cursor', 'text')
 							]),
 						A2(
 							elm$core$List$map,
-							A3(author$project$Textarea$renderStyledText, d, lift, highlighter),
+							A3(author$project$Textarea$renderStyledText, d, lift, config.highlighter),
 							lineElems));
 				}),
 			d.styledTexts);
@@ -11507,6 +12433,15 @@ var author$project$Textarea$view = F3(
 						[
 							elm$html$Html$text('\n                    .blinking-cursor {\n                        opacity: 1;\n                        animation: 1s blink step-end infinite;\n                    }\n\n                    @keyframes blink {\n                      from, to {\n                        opacity: 1;\n                      }\n                      50% {\n                        opacity: 0;\n                      }\n                    }\n        ')
 						])),
+					function () {
+					var _n6 = config.predictionConfig;
+					if (_n6.$ === 'Just') {
+						var predConf = _n6.a;
+						return A3(author$project$Textarea$viewPredictions, lift, predConf, d);
+					} else {
+						return elm$html$Html$text('');
+					}
+				}(),
 					A2(
 					elm$html$Html$map,
 					lift,
@@ -11519,14 +12454,8 @@ var author$project$Textarea$view = F3(
 								author$project$Textarea$textareaId(d)),
 								A2(elm$html$Html$Attributes$style, 'position', 'fixed'),
 								A2(elm$html$Html$Attributes$style, 'padding', '0'),
-								A2(
-								elm$html$Html$Attributes$style,
-								'left',
-								author$project$Textarea$devMode ? '350px' : '-10000px'),
-								A2(
-								elm$html$Html$Attributes$style,
-								'top',
-								author$project$Textarea$devMode ? '65px' : '-10000px'),
+								A2(elm$html$Html$Attributes$style, 'left', '-10000px'),
+								A2(elm$html$Html$Attributes$style, 'top', '-10000px'),
 								A2(elm$html$Html$Attributes$style, 'width', '200px'),
 								A2(elm$html$Html$Attributes$style, 'height', '100px'),
 								A2(
@@ -11562,14 +12491,29 @@ var author$project$Textarea$view = F3(
 								A2(
 								elm$html$Html$Events$custom,
 								'keydown',
-								A4(
-									elm$json$Json$Decode$map3,
-									F3(
-										function (keyCode, start, end) {
+								A5(
+									elm$json$Json$Decode$map4,
+									F4(
+										function (keyCode, ctrlKey, start, end) {
+											var stopEvt = function () {
+												if (A2(elm$core$Debug$log, 'kc', keyCode) === 9) {
+													return true;
+												} else {
+													var _n7 = d.predictions;
+													switch (_n7.$) {
+														case 'Closed':
+															return (!_Utils_eq(config.predictionConfig, elm$core$Maybe$Nothing)) ? ((keyCode === 32) && ctrlKey) : false;
+														case 'Loading':
+															return false;
+														default:
+															return ((keyCode === 13) || ((keyCode === 38) || ((keyCode === 40) || ((keyCode === 32) || (keyCode === 9))))) ? true : false;
+													}
+												}
+											}();
 											return {
-												message: A3(author$project$Internal$Textarea$OnKeyDown, keyCode, start, end),
-												preventDefault: keyCode === 9,
-												stopPropagation: keyCode === 9
+												message: A4(author$project$Internal$Textarea$OnKeyDown, keyCode, ctrlKey, start, end),
+												preventDefault: stopEvt,
+												stopPropagation: stopEvt
 											};
 										}),
 									A2(
@@ -11577,6 +12521,11 @@ var author$project$Textarea$view = F3(
 										_List_fromArray(
 											['keyCode']),
 										elm$json$Json$Decode$int),
+									A2(
+										elm$json$Json$Decode$at,
+										_List_fromArray(
+											['ctrlKey']),
+										elm$json$Json$Decode$bool),
 									A2(
 										elm$json$Json$Decode$at,
 										_List_fromArray(
@@ -11590,12 +12539,12 @@ var author$project$Textarea$view = F3(
 								A2(
 								elm$html$Html$Events$custom,
 								'keyup',
-								A4(
-									elm$json$Json$Decode$map3,
-									F3(
-										function (keyCode, start, end) {
+								A5(
+									elm$json$Json$Decode$map4,
+									F4(
+										function (keyCode, ctrlKey, start, end) {
 											return {
-												message: A3(author$project$Internal$Textarea$OnKeyUp, keyCode, start, end),
+												message: A4(author$project$Internal$Textarea$OnKeyUp, keyCode, ctrlKey, start, end),
 												preventDefault: keyCode === 9,
 												stopPropagation: keyCode === 9
 											};
@@ -11605,6 +12554,11 @@ var author$project$Textarea$view = F3(
 										_List_fromArray(
 											['keyCode']),
 										elm$json$Json$Decode$int),
+									A2(
+										elm$json$Json$Decode$at,
+										_List_fromArray(
+											['ctrlKey']),
+										elm$json$Json$Decode$bool),
 									A2(
 										elm$json$Json$Decode$at,
 										_List_fromArray(
@@ -11623,92 +12577,79 @@ var author$project$Textarea$view = F3(
 						_List_Nil))
 				]));
 	});
-var author$project$WithElmParser$TextClicked = {$: 'TextClicked'};
-var author$project$WithElmParser$renderer = function (myStyles) {
-	return A3(
-		elm$core$List$foldl,
-		F2(
-			function (myStyle, attrs) {
-				if (myStyle.$ === 'Keyword') {
-					return _Utils_ap(
-						attrs,
-						_List_fromArray(
-							[
-								A2(elm$html$Html$Attributes$style, 'color', 'grey'),
-								A2(elm$html$Html$Attributes$style, 'font-weight', 'bold'),
-								elm$html$Html$Events$onClick(author$project$WithElmParser$TextClicked)
-							]));
-				} else {
-					return _Utils_ap(
-						attrs,
-						_List_fromArray(
-							[
-								A2(elm$html$Html$Attributes$style, 'color', '#C086D0')
-							]));
-				}
-			}),
-		_List_Nil,
-		myStyles);
-};
+var elm$html$Html$h2 = _VirtualDom_node('h2');
 var author$project$WithElmParser$view = function (model) {
 	return A2(
 		elm$html$Html$div,
-		_List_fromArray(
-			[
-				A2(elm$html$Html$Attributes$style, 'width', '400px'),
-				A2(elm$html$Html$Attributes$style, 'height', '200px'),
-				A2(elm$html$Html$Attributes$style, 'position', 'relative'),
-				A2(elm$html$Html$Attributes$style, 'border', '1px solid lightgray')
-			]),
-		_List_fromArray(
-			[
-				A3(author$project$Textarea$view, author$project$WithElmParser$TextareaMsg, author$project$WithElmParser$renderer, model.textareaModel)
-			]));
-};
-var author$project$WithPorts$TextClicked = {$: 'TextClicked'};
-var author$project$WithPorts$renderer = function (myStyles) {
-	return A3(
-		elm$core$List$foldl,
-		F2(
-			function (myStyle, attrs) {
-				if (myStyle.$ === 'Keyword') {
-					return _Utils_ap(
-						attrs,
-						_List_fromArray(
-							[
-								A2(elm$html$Html$Attributes$style, 'color', 'grey'),
-								A2(elm$html$Html$Attributes$style, 'font-weight', 'bold'),
-								elm$html$Html$Events$onClick(author$project$WithPorts$TextClicked)
-							]));
-				} else {
-					return _Utils_ap(
-						attrs,
-						_List_fromArray(
-							[
-								A2(elm$html$Html$Attributes$style, 'color', '#C086D0')
-							]));
-				}
-			}),
 		_List_Nil,
-		myStyles);
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$h2,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Elm highlight, no predictions')
+					])),
+				A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						A2(elm$html$Html$Attributes$style, 'width', '400px'),
+						A2(elm$html$Html$Attributes$style, 'height', '200px'),
+						A2(elm$html$Html$Attributes$style, 'position', 'relative'),
+						A2(elm$html$Html$Attributes$style, 'border', '1px solid lightgray')
+					]),
+				_List_fromArray(
+					[
+						A2(author$project$Textarea$view, author$project$WithElmParser$config, model.textareaModel)
+					]))
+			]));
 };
 var author$project$WithPorts$view = function (model) {
 	return A2(
 		elm$html$Html$div,
+		_List_Nil,
 		_List_fromArray(
 			[
-				A2(elm$html$Html$Attributes$style, 'width', '400px'),
-				A2(elm$html$Html$Attributes$style, 'height', '200px'),
-				A2(elm$html$Html$Attributes$style, 'position', 'relative'),
-				A2(elm$html$Html$Attributes$style, 'border', '1px solid lightgray')
-			]),
-		_List_fromArray(
-			[
-				A3(author$project$Textarea$view, author$project$WithPorts$TextareaMsg, author$project$WithPorts$renderer, model.textareaModel)
+				A2(
+				elm$html$Html$h2,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Highlighting/Predictions in JS')
+					])),
+				A2(
+				elm$html$Html$div,
+				_List_fromArray(
+					[
+						A2(elm$html$Html$Attributes$style, 'width', '400px'),
+						A2(elm$html$Html$Attributes$style, 'height', '200px'),
+						A2(elm$html$Html$Attributes$style, 'position', 'relative'),
+						A2(elm$html$Html$Attributes$style, 'border', '1px solid lightgray')
+					]),
+				_List_fromArray(
+					[
+						A2(author$project$Textarea$view, author$project$WithPorts$config, model.textareaModel)
+					])),
+				A2(
+				elm$html$Html$p,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Type '),
+						A2(
+						elm$html$Html$code,
+						_List_Nil,
+						_List_fromArray(
+							[
+								elm$html$Html$text('CTRL+SPACE')
+							])),
+						elm$html$Html$text(' to trigger prediction menu.')
+					]))
 			]));
 };
 var elm$html$Html$h1 = _VirtualDom_node('h1');
-var elm$html$Html$h2 = _VirtualDom_node('h2');
 var author$project$Main$view = function (model) {
 	return A2(
 		elm$html$Html$div,
@@ -11750,42 +12691,20 @@ var author$project$Main$view = function (model) {
 				_List_fromArray(
 					[
 						A2(
-						elm$html$Html$div,
-						_List_Nil,
-						_List_fromArray(
-							[
-								A2(
-								elm$html$Html$h2,
-								_List_Nil,
-								_List_fromArray(
-									[
-										elm$html$Html$text('Elm highlight')
-									])),
-								A2(
-								elm$html$Html$map,
-								author$project$Main$PureMsg,
-								author$project$WithElmParser$view(model.pureModel))
-							])),
+						elm$html$Html$map,
+						author$project$Main$PureMsg,
+						author$project$WithElmParser$view(model.pureModel)),
 						A2(
 						elm$html$Html$div,
 						_List_fromArray(
 							[
-								A2(elm$html$Html$Attributes$style, 'margin-left', '16px')
+								A2(elm$html$Html$Attributes$style, 'width', '16px')
 							]),
-						_List_fromArray(
-							[
-								A2(
-								elm$html$Html$h2,
-								_List_Nil,
-								_List_fromArray(
-									[
-										elm$html$Html$text('JS highlight (with ports)')
-									])),
-								A2(
-								elm$html$Html$map,
-								author$project$Main$PortsMsg,
-								author$project$WithPorts$view(model.portsModel))
-							]))
+						_List_Nil),
+						A2(
+						elm$html$Html$map,
+						author$project$Main$PortsMsg,
+						author$project$WithPorts$view(model.portsModel))
 					]))
 			]));
 };
@@ -11800,4 +12719,4 @@ var author$project$Main$main = elm$browser$Browser$element(
 		view: author$project$Main$view
 	});
 _Platform_export({'Main':{'init':author$project$Main$main(
-	elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.0"},"types":{"message":"Main.Msg","aliases":{"Textarea.Msg":{"args":[],"type":"Internal.Textarea.Msg"},"Json.Decode.Value":{"args":[],"type":"Json.Encode.Value"},"Browser.Dom.Element":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float }, element : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"},"Browser.Dom.Viewport":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"}},"unions":{"Main.Msg":{"args":[],"tags":{"PureMsg":["WithElmParser.Msg"],"PortsMsg":["WithPorts.Msg"]}},"WithElmParser.Msg":{"args":[],"tags":{"TextareaMsg":["Textarea.Msg"],"TextClicked":[]}},"WithPorts.Msg":{"args":[],"tags":{"TextareaMsg":["Textarea.Msg"],"TextClicked":[],"OnParseResult":["Json.Decode.Value"]}},"Internal.Textarea.Msg":{"args":[],"tags":{"OnInput":["String.String","Basics.Int","Basics.Int"],"OnKeyDown":["Basics.Int","Basics.Int","Basics.Int"],"OnKeyUp":["Basics.Int","Basics.Int","Basics.Int"],"MouseDown":["Basics.Int"],"MouseUp":["Basics.Int"],"MouseOver":["Basics.Int"],"MouseDownLine":["Basics.Int"],"MouseOverLine":["Basics.Int"],"MouseUpLine":["Basics.Int"],"MouseClicks":["Basics.Int","Basics.Float"],"BackgroundMouseDown":[],"BackgroundMouseOver":[],"BackgroundMouseUp":[],"BackgroundMouseLeft":[],"BackgroundMouseEnter":["Basics.Int"],"Focused":["Result.Result Browser.Dom.Error ()"],"Blurred":[],"GetViewportPos":["Result.Result Browser.Dom.Error Browser.Dom.Element"],"GetViewport":["Result.Result Browser.Dom.Error Browser.Dom.Viewport"],"GetCharViewport":["Result.Result Browser.Dom.Error Browser.Dom.Element"],"Scrolled":["Basics.Float","Basics.Float"],"DebounceMsg":["Debounce.Msg"],"TriggerHighlight":[],"NoOp":[]}},"Json.Encode.Value":{"args":[],"tags":{"Value":[]}},"Browser.Dom.Error":{"args":[],"tags":{"NotFound":["String.String"]}},"Basics.Float":{"args":[],"tags":{"Float":[]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"Result.Result":{"args":["error","value"],"tags":{"Ok":["value"],"Err":["error"]}},"String.String":{"args":[],"tags":{"String":[]}},"Debounce.Msg":{"args":[],"tags":{"NoOp":[],"Flush":["Maybe.Maybe Basics.Float"],"SendIfLengthNotChangedFrom":["Basics.Int"]}},"Maybe.Maybe":{"args":["a"],"tags":{"Just":["a"],"Nothing":[]}}}}})}});}(this));
+	elm$json$Json$Decode$succeed(_Utils_Tuple0))({"versions":{"elm":"0.19.0"},"types":{"message":"Main.Msg","aliases":{"Textarea.Msg":{"args":[],"type":"Internal.Textarea.Msg"},"Json.Decode.Value":{"args":[],"type":"Json.Encode.Value"},"Browser.Dom.Element":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float }, element : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"},"Browser.Dom.Viewport":{"args":[],"type":"{ scene : { width : Basics.Float, height : Basics.Float }, viewport : { x : Basics.Float, y : Basics.Float, width : Basics.Float, height : Basics.Float } }"}},"unions":{"Main.Msg":{"args":[],"tags":{"PureMsg":["WithElmParser.Msg"],"PortsMsg":["WithPorts.Msg"]}},"WithElmParser.Msg":{"args":[],"tags":{"TextareaMsg":["Textarea.Msg"],"TextClicked":[]}},"WithPorts.Msg":{"args":[],"tags":{"TextareaMsg":["Textarea.Msg"],"TextClicked":[],"OnParseResult":["Json.Decode.Value"],"OnPredictResult":["Json.Decode.Value"]}},"Internal.Textarea.Msg":{"args":[],"tags":{"OnInput":["String.String","Basics.Int","Basics.Int"],"OnKeyDown":["Basics.Int","Basics.Bool","Basics.Int","Basics.Int"],"OnKeyUp":["Basics.Int","Basics.Bool","Basics.Int","Basics.Int"],"MouseDown":["Basics.Int"],"MouseUp":["Basics.Int"],"MouseOver":["Basics.Int"],"MouseDownLine":["Basics.Int"],"MouseOverLine":["Basics.Int"],"MouseUpLine":["Basics.Int"],"MouseClicks":["Basics.Int","Basics.Float"],"BackgroundMouseDown":[],"BackgroundMouseOver":[],"BackgroundMouseUp":[],"BackgroundMouseLeft":[],"BackgroundMouseEnter":["Basics.Int"],"Focused":["Result.Result Browser.Dom.Error ()"],"Blurred":[],"GetViewportPos":["Result.Result Browser.Dom.Error Browser.Dom.Element"],"GetViewport":["Result.Result Browser.Dom.Error Browser.Dom.Viewport"],"GetCharViewport":["Result.Result Browser.Dom.Error Browser.Dom.Element"],"Scrolled":["Basics.Float","Basics.Float"],"DebounceMsg":["Debounce.Msg"],"TriggerHighlight":[],"GetPredictionCharViewport":["Result.Result Browser.Dom.Error Browser.Dom.Element"],"PredictionClicked":["Basics.Int"],"NoOp":[]}},"Json.Encode.Value":{"args":[],"tags":{"Value":[]}},"Browser.Dom.Error":{"args":[],"tags":{"NotFound":["String.String"]}},"Basics.Bool":{"args":[],"tags":{"True":[],"False":[]}},"Basics.Float":{"args":[],"tags":{"Float":[]}},"Basics.Int":{"args":[],"tags":{"Int":[]}},"Result.Result":{"args":["error","value"],"tags":{"Ok":["value"],"Err":["error"]}},"String.String":{"args":[],"tags":{"String":[]}},"Debounce.Msg":{"args":[],"tags":{"NoOp":[],"Flush":["Maybe.Maybe Basics.Float"],"SendIfLengthNotChangedFrom":["Basics.Int"]}},"Maybe.Maybe":{"args":["a"],"tags":{"Just":["a"],"Nothing":[]}}}}})}});}(this));

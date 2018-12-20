@@ -16,7 +16,7 @@
 <script>
     const app = Elm.Main.init({node: document.getElementById("app")});
 
-    // wire parsing ports !
+    // wire parsing ports
     app.ports.highlight.subscribe(highlightRequest => {
         const styles = highlight(highlightRequest.text);
         app.ports.onHighlightResponse.send({
@@ -38,8 +38,6 @@
         return words.map(k => highlightWord(0, str, k, style)).flat();
     }
 
-
-
     function highlightWord(index, str, word, style) {
         const i = str.indexOf(word);
         if (i === -1) {
@@ -59,6 +57,26 @@
             );
         }
     }
+
+    // wire prediction ports
+    app.ports.predict.subscribe(predictRequest => {
+        app.ports.onPredictResponse.send({
+            id: predictRequest.id,
+            predictions: [
+                "let",
+                "in",
+                "foo",
+                "bar",
+                "baz",
+                "stuff",
+                "more",
+                "things",
+                "blah",
+                "merry",
+                "xmas"
+            ]
+        });
+    });
 
 
 
