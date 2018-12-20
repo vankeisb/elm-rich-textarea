@@ -247,6 +247,7 @@ view config (Model d) =
                             , mouseEvent "mousedown" (\_ -> lift <| MouseDownLine lineNumber)
                             , mouseEvent "mouseover" (\_ -> lift <| MouseOverLine lineNumber)
                             , mouseEvent "mouseup" (\_ -> lift <| MouseUpLine lineNumber)
+                            , style "cursor" "text"
                             ]
                             (lineElems
                                 |> List.map
