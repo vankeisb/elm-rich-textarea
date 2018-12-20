@@ -32,22 +32,18 @@ type MyStyle
     Your Model should keep the textarea's Model, that's parent/child...
 -}
 type alias Model =
-    { textareaModel : Textarea.Model MyStyle
+    { textareaModel : Textarea.Model MyStyle ()
     }
 
 
 init : String -> ( Model, Cmd Msg )
 init idPrefix =
     let
-        initialText =
-            "let\n  foo = 1\nin\n  foo + bar"
-
-
-        -- init the textarea : we pass the text and
-        -- the styles for this text
         ( m, c ) =
-            Textarea.init
-                (Textarea.defaultInitData idPrefix initialText)
+            Textarea.init <|
+                Textarea.defaultInitData
+                    idPrefix
+                    "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m
       }
@@ -55,18 +51,31 @@ init idPrefix =
     )
 
 
+
+config: Textarea.Config MyStyle () Msg
+config =
+    { lift = TextareaMsg
+    , highlighter = renderer
+    , predictionConfig = Nothing
+    }
+
+
+
 view : Model -> Html Msg
 view model =
     div
-        [ style "width" "400px"
-        , style "height" "200px"
-        , style "position" "relative"
-        , style "border" "1px solid lightgray"
-        ]
-        [ Textarea.view
-            TextareaMsg
-            renderer
-            model.textareaModel
+        []
+        [ h2
+            []
+            [ text "Elm highlight, no predictions"]
+        , div
+            [ style "width" "400px"
+            , style "height" "200px"
+            , style "position" "relative"
+            , style "border" "1px solid lightgray"
+            ]
+            [ Textarea.view config model.textareaModel
+            ]
         ]
 
 
@@ -89,6 +98,7 @@ renderer myStyles =
                                ]
             )
             []
+
 
 
 highlight : String -> List ( Range, MyStyle )
@@ -134,7 +144,7 @@ update msg model =
         TextareaMsg sub ->
             let
                 ( tm, c, o ) =
-                    Textarea.update sub model.textareaModel
+                    Textarea.update config sub model.textareaModel
 
                 tm2 =
                     case o of
@@ -144,7 +154,7 @@ update msg model =
                                 (highlight hr.text)
                                 tm
 
-                        Nothing ->
+                        _ ->
                             tm
             in
             ( { model

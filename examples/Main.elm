@@ -58,22 +58,13 @@ view model =
             [ style "display" "flex"
             , style "flex-direction" "row"
             ]
-            [ div
-                []
-                [ h2
-                    []
-                    [ text "Elm highlight" ]
-                , WithElmParser.view model.pureModel
-                    |> Html.map PureMsg
-                ]
+            [ WithElmParser.view model.pureModel
+                |> Html.map PureMsg
             , div
-                [ style "margin-left" "16px" ]
-                [ h2
-                    []
-                    [ text "JS highlight (with ports)"]
-                , WithPorts.view model.portsModel
-                    |> Html.map PortsMsg
-                ]
+                [ style "width" "16px" ]
+                []
+            , WithPorts.view model.portsModel
+                |> Html.map PortsMsg
             ]
         ]
 
