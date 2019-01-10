@@ -83,10 +83,10 @@ update config msg model =
     case msg of
         LiftMsg sub ->
             let
-                ( tm, c, o ) =
+                ( model1, cmd, o ) =
                     Textarea.update config_ sub model
 
-                cmd =
+                cmd1 =
                     case o of
                         Just (Textarea.RequestHighlight hr) ->
                             let
@@ -103,10 +103,10 @@ update config msg model =
                         _ ->
                             Cmd.none
             in
-            ( model
+            ( model1
             , Cmd.batch
-                [ Cmd.map (config.lift << LiftMsg) c
-                , cmd
+                [ Cmd.map (config.lift << LiftMsg) cmd
+                , cmd1
                 ]
             )
 
