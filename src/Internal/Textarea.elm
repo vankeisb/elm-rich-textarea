@@ -1,21 +1,21 @@
 module Internal.Textarea exposing
     ( Box
-    , Uuid
     , Model(..)
     , ModelData
     , Msg(..)
+    , Uuid
     , encodeUuid
-    , nextUuid
-    , uuidDecoder
     , initialUuid
     , lineSize
+    , nextUuid
+    , uuidDecoder
     )
 
 import Array
 import Browser.Dom as Dom
 import Debounce
-import Internal.Styles exposing (StyledText, Styles)
 import Internal.Predictions exposing (Predictions)
+import Internal.Styles exposing (StyledText, Styles)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Range exposing (Range)
@@ -59,10 +59,9 @@ initialUuid =
     Uuid 0
 
 
-nextUuid: Uuid -> Uuid
+nextUuid : Uuid -> Uuid
 nextUuid (Uuid i) =
     Uuid (i + 1)
-
 
 
 type alias ModelData s p =
@@ -77,8 +76,8 @@ type alias ModelData s p =
     , highlightId : Uuid
     , debounce : Debounce.Debounce Uuid
     , debounceMs : Float
-    , predictions: Predictions p
-    , predictionId: Uuid
+    , predictions : Predictions p
+    , predictionId : Uuid
     }
 
 

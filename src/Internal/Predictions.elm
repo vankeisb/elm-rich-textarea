@@ -1,41 +1,41 @@
 module Internal.Predictions exposing
     ( Predictions(..)
     , PredictionsData
-    , toList
-    , fromList
-    , isSelected
-    , moveUp
-    , moveDown
-    , getInitialCaretPos
     , applyFilter
+    , fromList
+    , getInitialCaretPos
     , getSelected
+    , isSelected
+    , moveDown
+    , moveUp
     , setSelected
+    , toList
     )
-
 
 import Browser.Dom as Dom
 
 
-type PredictionsData p =
-    PredictionsData
-        { start: List p
-        , selected: Maybe p
-        , end: List p
-        , initialCaretPos: Int
-        , allItems: List p
+type PredictionsData p
+    = PredictionsData
+        { start : List p
+        , selected : Maybe p
+        , end : List p
+        , initialCaretPos : Int
+        , allItems : List p
         }
 
 
-toList: PredictionsData p -> List p
+toList : PredictionsData p -> List p
 toList (PredictionsData d) =
-    d.start ++
-        (d.selected
-            |> Maybe.map (\p -> [ p ])
-            |> Maybe.withDefault []
-        ) ++ d.end
+    d.start
+        ++ (d.selected
+                |> Maybe.map (\p -> [ p ])
+                |> Maybe.withDefault []
+           )
+        ++ d.end
 
 
-fromList: Int -> List p -> PredictionsData p
+fromList : Int -> List p -> PredictionsData p
 fromList caretPos ps =
     PredictionsData
         { start = []
@@ -49,40 +49,38 @@ fromList caretPos ps =
         |> selectFirst
 
 
-selectFirst: PredictionsData p -> PredictionsData p
+selectFirst : PredictionsData p -> PredictionsData p
 selectFirst (PredictionsData d) =
     case d.start of
-         p :: ps ->
+        p :: ps ->
             PredictionsData
                 { d
                     | start = []
                     , selected = Just p
                     , end =
-                        ps ++
-                            ( d.selected
-                                |> Maybe.map (\pred -> [ pred ] )
-                                |> Maybe.withDefault []
-                            ) ++
-                            d.end
+                        ps
+                            ++ (d.selected
+                                    |> Maybe.map (\pred -> [ pred ])
+                                    |> Maybe.withDefault []
+                               )
+                            ++ d.end
                 }
 
-         [] ->
-             PredictionsData d
+        [] ->
+            PredictionsData d
 
 
-
-isSelected: p -> PredictionsData p -> Bool
+isSelected : p -> PredictionsData p -> Bool
 isSelected p (PredictionsData d) =
     d.selected == Just p
 
 
-getInitialCaretPos: PredictionsData p -> Int
+getInitialCaretPos : PredictionsData p -> Int
 getInitialCaretPos (PredictionsData pd) =
     pd.initialCaretPos
 
 
-
-getSelected: PredictionsData p -> Maybe p
+getSelected : PredictionsData p -> Maybe p
 getSelected (PredictionsData pd) =
     pd.selected
 
@@ -93,11 +91,12 @@ type Predictions p
     | Open Dom.Element (PredictionsData p)
 
 
-moveUp: PredictionsData p -> PredictionsData p
+moveUp : PredictionsData p -> PredictionsData p
 moveUp (PredictionsData d) =
     PredictionsData <|
         if List.isEmpty d.start then
             d
+
         else
             case d.selected of
                 Just selected ->
@@ -115,15 +114,17 @@ moveUp (PredictionsData d) =
                         , end =
                             selected :: d.end
                     }
+
                 Nothing ->
                     d
 
 
-moveDown: PredictionsData p -> PredictionsData p
+moveDown : PredictionsData p -> PredictionsData p
 moveDown (PredictionsData d) =
     PredictionsData <|
         if List.isEmpty d.end then
             d
+
         else
             case d.selected of
                 Just selected ->
@@ -137,11 +138,12 @@ moveDown (PredictionsData d) =
                                 |> List.tail
                                 |> Maybe.withDefault []
                     }
+
                 Nothing ->
                     d
 
 
-applyFilter: (p -> String) -> String -> PredictionsData p -> PredictionsData p
+applyFilter : (p -> String) -> String -> PredictionsData p -> PredictionsData p
 applyFilter predictionText filterString (PredictionsData pd) =
     let
         preds =
@@ -158,25 +160,26 @@ applyFilter predictionText filterString (PredictionsData pd) =
             pd.selected
                 |> Maybe.map predictionText
 
-
-        (start, sel, end) =
+        ( start, sel, end ) =
             filtered
                 |> List.foldl
-                    (\pred (st,sl,ed) ->
+                    (\pred ( st, sl, ed ) ->
                         case sl of
                             Just _ ->
                                 -- already a selected item, append to "end"
-                                (st, sl, ed ++ [ pred ])
+                                ( st, sl, ed ++ [ pred ] )
+
                             Nothing ->
                                 -- no selected item yet, check if this is the one !
                                 if previouslySelectedText == Just (predictionText pred) then
                                     -- yep, this is the one !
-                                    (st, Just pred, [])
+                                    ( st, Just pred, [] )
+
                                 else
                                     -- not the one, append to "start"
-                                    (st ++ [ pred ], Nothing, [])
+                                    ( st ++ [ pred ], Nothing, [] )
                     )
-                    ([], Nothing, [])
+                    ( [], Nothing, [] )
 
         newPd =
             PredictionsData
@@ -188,11 +191,12 @@ applyFilter predictionText filterString (PredictionsData pd) =
     in
     if sel == Nothing then
         selectFirst newPd
+
     else
         newPd
 
 
-setSelected: p -> Predictions p -> Predictions p
+setSelected : p -> Predictions p -> Predictions p
 setSelected p preds =
     case preds of
         Open e pdata ->
@@ -200,24 +204,26 @@ setSelected p preds =
                 (PredictionsData pd) =
                     pdata
 
-                (start, sel, end) =
+                ( start, sel, end ) =
                     toList pdata
                         |> List.foldl
-                            (\pred (st,sl,ed) ->
+                            (\pred ( st, sl, ed ) ->
                                 case sl of
                                     Just _ ->
                                         -- already a selected item, append to "end"
-                                        (st, sl, ed ++ [ pred ])
+                                        ( st, sl, ed ++ [ pred ] )
+
                                     Nothing ->
                                         -- no selected item yet, check if this is the one !
                                         if pred == p then
                                             -- yep, this is the one !
-                                            (st, Just pred, [])
+                                            ( st, Just pred, [] )
+
                                         else
                                             -- not the one, append to "start"
-                                            (st ++ [ pred ], Nothing, [])
+                                            ( st ++ [ pred ], Nothing, [] )
                             )
-                            ([], Nothing, [])
+                            ( [], Nothing, [] )
             in
             Open e <|
                 PredictionsData
@@ -226,5 +232,6 @@ setSelected p preds =
                         , selected = sel
                         , end = end
                     }
+
         _ ->
             preds
