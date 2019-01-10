@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "utilities for building the app",
   "scripts": {
-    "build": "elm-test && cd examples && elm make Main.elm --output=elm.js --debug",
+    "build": "elm-test && cd examples && elm make Main.elm --output=elm.js --debug && elm make Main2.elm --output=elm2.js --debug",
     "test": "elm-test",
     "format": "elm-format --yes src",
     "watch": "chokidar 'src/**/*.elm' -c 'cd examples && elm make Main.elm --output elm.js --debug' --initial",
