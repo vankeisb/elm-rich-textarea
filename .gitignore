@@ -3,3 +3,4 @@ elm-stuff
 *.iml
 node_modules
 yarn*
+elm-package.json
