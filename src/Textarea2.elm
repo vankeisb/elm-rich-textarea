@@ -1,17 +1,20 @@
 module Textarea2 exposing
-    ( InitData
+    ( ApplyStylesFun
+    , InitData
     , Model
     , Msg
     , UpdateConfig
     , ViewConfig
     , defaultInitData
     , init
+    , stylesDecoder
     , subscriptions
     , update
     , view
     )
 
 import Html
+import Json.Decode as D
 import Range
 import Task
 import Textarea
@@ -126,3 +129,18 @@ update config msg model =
 subscriptions : Model s m -> Sub (Msg s m)
 subscriptions model =
     Sub.map LiftMsg <| Textarea.subscriptions model
+
+
+stylesDecoder : D.Decoder s -> D.Decoder (List ( Range.Range, s ))
+stylesDecoder styleDecoder =
+    let
+        rangeAndStyleDecoder : D.Decoder ( Range.Range, s )
+        rangeAndStyleDecoder =
+            D.map2
+                (\range styleValue ->
+                    ( range, styleValue )
+                )
+                (D.field "range" Textarea.rangeDecoder)
+                (D.field "style" styleDecoder)
+    in
+    D.list rangeAndStyleDecoder

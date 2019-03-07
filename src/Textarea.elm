@@ -19,6 +19,7 @@ module Textarea exposing
     , highlightResponseDecoder
     , init
     , predictResponseDecoder
+    , rangeDecoder
     , subscriptions
     , update
     , view

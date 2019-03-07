@@ -5,18 +5,18 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import WithElmParser2
-import WithPorts
+import WithPorts2
 
 
 type alias Model =
     { pureModel : WithElmParser2.Model
-    , portsModel : WithPorts.Model
+    , portsModel : WithPorts2.Model
     }
 
 
 type Msg
     = PureMsg WithElmParser2.Msg
-    | PortsMsg WithPorts.Msg
+    | PortsMsg WithPorts2.Msg
 
 
 init =
@@ -25,7 +25,7 @@ init =
             WithElmParser2.init "ta-pure"
 
         ( portsModel, portsCmd ) =
-            WithPorts.init "ta-ports"
+            WithPorts2.init "ta-ports"
     in
     ( { pureModel = pureModel
       , portsModel = portsModel
@@ -61,8 +61,7 @@ view model =
             , div
                 [ style "width" "16px" ]
                 []
-            , text "TODO Textarea2"
-            , WithPorts.view model.portsModel
+            , WithPorts2.view model.portsModel
                 |> Html.map PortsMsg
             ]
         ]
@@ -83,7 +82,7 @@ update msg model =
         PortsMsg sub ->
             let
                 ( m, c ) =
-                    WithPorts.update sub model.portsModel
+                    WithPorts2.update sub model.portsModel
             in
             ( { model | portsModel = m }
             , Cmd.map PortsMsg c
@@ -95,7 +94,7 @@ subscriptions model =
     Sub.batch
         [ WithElmParser2.subscriptions model.pureModel
             |> Sub.map PureMsg
-        , WithPorts.subscriptions model.portsModel
+        , WithPorts2.subscriptions model.portsModel
             |> Sub.map PortsMsg
         ]
 
