@@ -61,6 +61,7 @@ view model =
             , div
                 [ style "width" "16px" ]
                 []
+            , text "TODO Textarea2"
             , WithPorts.view model.portsModel
                 |> Html.map PortsMsg
             ]

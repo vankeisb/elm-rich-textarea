@@ -7,7 +7,7 @@
     "test": "elm-test",
     "format": "elm-format --yes src",
     "watch": "chokidar 'src/**/*.elm' -c 'cd examples && elm make Main.elm --output elm.js --debug' --initial",
-    "docs-site": "mkdir -p docs/ && rm -rf docs/* && npm run build && cp examples/index.html docs/ && cp examples/elm.js docs/"
+    "docs-site": "mkdir -p docs/ && rm -rf docs/* && npm run build && cp examples/index*.html examples/elm*.js docs/"
   },
   "devDependencies": {
     "chokidar-cli": "^1.2.1",
