@@ -1,14 +1,10 @@
 module WithElmParser2 exposing (Model, Msg(..), MyStyle(..), config, highlight, init, renderer, subscriptions, update, view)
 
-import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
-import Json.Decode as D
-import Json.Encode as E
 import Platform.Cmd exposing (Cmd)
 import Range exposing (Range)
-import Task
 import Textarea2 as Textarea
 
 
@@ -177,8 +173,6 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ -- TODO
-          --Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
-          --,
-          Sub.none
+        [ Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
+        , Sub.none
         ]

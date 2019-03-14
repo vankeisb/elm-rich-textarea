@@ -48,7 +48,6 @@ type alias MyPrediction =
 
 type alias Model =
     { textareaModel : Textarea.Model MyStyle MyPrediction
-    , blah : String
     , applyStyles : Maybe (Textarea.ApplyStylesFun MyStyle Msg)
     , applyPredictions : Maybe (Textarea.ApplyPredictionsFun MyPrediction Msg)
     }
@@ -64,7 +63,6 @@ init idPrefix =
                     "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m
-      , blah = ""
       , applyStyles = Nothing
       , applyPredictions = Nothing
       }
