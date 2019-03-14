@@ -19,7 +19,7 @@ import Textarea2 as Textarea
 
 
 type Msg
-    = TextareaMsg (Textarea.Msg MyStyle Msg)
+    = TextareaMsg (Textarea.Msg MyStyle () Msg)
     | TextClicked
 
 
@@ -71,7 +71,6 @@ config =
 updateConfig : Textarea.UpdateConfig MyStyle () Msg
 updateConfig =
     { lift = TextareaMsg
-    , highlighter = renderer
     , predictionConfig = Nothing
     , requestHighlight =
         \applyStyles text ->

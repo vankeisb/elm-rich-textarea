@@ -1,13 +1,11 @@
 port module WithPorts2 exposing (Model, Msg(..), MyPrediction, MyStyle(..), config, highlight, highlighter, init, myStyleDecoder, onHighlightResponse, onPredictResponse, predict, subscriptions, update, view)
 
-import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Json.Decode as D
 import Json.Encode as E
 import Platform.Cmd exposing (Cmd)
-import Range exposing (Range)
 import Task
 import Textarea2 as Textarea
 
@@ -19,11 +17,12 @@ import Textarea2 as Textarea
 
 
 type Msg
-    = TextareaMsg (Textarea.Msg MyStyle Msg)
+    = TextareaMsg (Textarea.Msg MyStyle MyPrediction Msg)
     | TextClicked
     | OnParseResult D.Value
     | OnPredictResult D.Value
     | RequestHighlight String (Textarea.ApplyStylesFun MyStyle Msg)
+    | RequestPrediction ( String, Int ) (Textarea.ApplyPredictionsFun MyPrediction Msg)
 
 
 
@@ -51,6 +50,7 @@ type alias Model =
     { textareaModel : Textarea.Model MyStyle MyPrediction
     , blah : String
     , applyStyles : Maybe (Textarea.ApplyStylesFun MyStyle Msg)
+    , applyPredictions : Maybe (Textarea.ApplyPredictionsFun MyPrediction Msg)
     }
 
 
@@ -66,6 +66,7 @@ init idPrefix =
     ( { textareaModel = m
       , blah = ""
       , applyStyles = Nothing
+      , applyPredictions = Nothing
       }
     , Cmd.map TextareaMsg c
     )
@@ -75,34 +76,32 @@ config : Textarea.ViewConfig MyStyle MyPrediction Msg
 config =
     { lift = TextareaMsg
     , highlighter = highlighter
-    , predictionConfig =
-        Just
-            { text = identity
-            , icon =
-                \pred ->
-                    if pred == "foo" || pred == "bar" then
-                        Just <| text "λ"
+    , predictionConfig = Just myPredictionConfig
+    }
 
-                    else
-                        Nothing
-            }
+
+myPredictionConfig : Textarea.PredictionConfig MyPrediction Msg
+myPredictionConfig =
+    { text = identity
+    , icon =
+        \pred ->
+            if pred == "foo" || pred == "bar" then
+                Just <| text "λ"
+
+            else
+                Nothing
     }
 
 
 updateConfig : Textarea.UpdateConfig MyStyle MyPrediction Msg
 updateConfig =
     { lift = TextareaMsg
-    , highlighter = renderer
     , predictionConfig =
         Just
-            { text = identity
-            , icon =
-                \pred ->
-                    if pred == "foo" || pred == "bar" then
-                        Just <| text "λ"
-
-                    else
-                        Nothing
+            { config = myPredictionConfig
+            , requestPrediction =
+                \applyPredictions pos ->
+                    RequestPrediction pos applyPredictions
             }
     , requestHighlight =
         \applyStyles text ->
@@ -221,34 +220,33 @@ update msg model =
                     ( model, Cmd.none )
 
         OnPredictResult v ->
-            --            let
-            --                pr =
-            --                    D.decodeValue
-            --                        (Textarea.predictResponseDecoder D.string)
-            --                        v
-            --            in
-            --            case Debug.log "pr" pr of
-            --                Ok predictResponse ->
-            --                    let
-            --                        ( tm, tc ) =
-            --                            Textarea.applyPredictions
-            --                                config
-            --                                predictResponse
-            --                                model.textareaModel
-            --                    in
-            --                    ( { model
-            --                        | textareaModel =
-            --                            tm
-            --                      }
-            --                    , Cmd.map TextareaMsg tc
-            --                    )
-            --
-            --                Err e ->
-            --                    let
-            --                        x =
-            --                            Debug.log "failed to decode prediction response" (Debug.toString e)
-            --                    in
-            ( model, Cmd.none )
+            let
+                pr =
+                    D.decodeValue
+                        (Textarea.predictionsDecoder D.string)
+                        v
+            in
+            case pr of
+                Ok predictions ->
+                    ( { model
+                        | applyPredictions = Nothing
+                      }
+                    , model.applyPredictions
+                        |> Maybe.map
+                            (\apply ->
+                                predictions
+                                    |> Task.succeed
+                                    |> Task.perform apply
+                            )
+                        |> Maybe.withDefault Cmd.none
+                    )
+
+                Err e ->
+                    let
+                        x =
+                            Debug.log "failed to decode prediction response" (Debug.toString e)
+                    in
+                    ( model, Cmd.none )
 
         TextClicked ->
             ( model, Cmd.none )
@@ -256,6 +254,15 @@ update msg model =
         RequestHighlight text applyFun ->
             ( { model | applyStyles = Just applyFun }
             , highlight text
+            )
+
+        RequestPrediction ( text, offset ) applyFun ->
+            ( { model | applyPredictions = Just applyFun }
+            , predict <|
+                E.object
+                    [ ( "text", E.string text )
+                    , ( "offset", E.int offset )
+                    ]
             )
 
 
@@ -303,9 +310,7 @@ myStyleDecoder =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ -- TODO
-          --Sub.map TextareaMsg <| Textarea.subscriptions model.textareaModel
-          --,
-          onHighlightResponse OnParseResult
+        [ onHighlightResponse OnParseResult
         , onPredictResponse OnPredictResult
+        , Sub.map TextareaMsg (Textarea.subscriptions model.textareaModel)
         ]

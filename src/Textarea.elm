@@ -9,6 +9,7 @@ module Textarea exposing
     , Msg
     , OutMsg(..)
     , PredictionConfig
+    , PredictionId
     , PredictionRequest
     , PredictionResponse
     , applyPredictions
@@ -29,7 +30,6 @@ module Textarea exposing
 -}
 
 import Array
-import Browser
 import Browser.Dom as Dom
 import Debounce
 import Html exposing (..)
@@ -40,11 +40,9 @@ import Internal.Styles as S exposing (StyledText, Styles)
 import Internal.Textarea exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
-import Process
 import Range exposing (Range)
 import Task
 import TextUtil exposing (lineRangeAt, wordRangeAt)
-import Time exposing (Posix)
 
 
 {-| Model, should be stored in the parent's

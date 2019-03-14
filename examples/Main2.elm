@@ -3,7 +3,6 @@ module Main2 exposing (Model, Msg(..), init, main, subscriptions, update, view)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
 import WithElmParser2
 import WithPorts2
 

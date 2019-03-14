@@ -1,12 +1,16 @@
 module Textarea2 exposing
-    ( ApplyStylesFun
+    ( ApplyPredictionsFun
+    , ApplyStylesFun
     , InitData
     , Model
     , Msg
+    , PredictionConfig
+    , PredictionConfig2
     , UpdateConfig
     , ViewConfig
     , defaultInitData
     , init
+    , predictionsDecoder
     , stylesDecoder
     , subscriptions
     , update
@@ -21,13 +25,18 @@ import Textarea
 import Tuple
 
 
-type Msg s m
+type Msg s p m
     = LiftMsg Textarea.Msg
     | ApplyStyles Textarea.HighlightId (List ( Range.Range, s ))
+    | ApplyPredictions Textarea.PredictionId (List p)
 
 
 type alias ApplyStylesFun s m =
     List ( Range.Range, s ) -> m
+
+
+type alias ApplyPredictionsFun p m =
+    List p -> m
 
 
 type alias InitData =
@@ -38,7 +47,7 @@ type alias Model s p =
     Textarea.Model s p
 
 
-init : InitData -> ( Model s p, Cmd (Msg s m) )
+init : InitData -> ( Model s p, Cmd (Msg s p m) )
 init =
     Textarea.init >> Tuple.mapSecond (Cmd.map LiftMsg)
 
@@ -48,10 +57,14 @@ defaultInitData =
 
 
 type alias ViewConfig s p m =
-    { lift : Msg s m -> m
+    { lift : Msg s p m -> m
     , highlighter : Textarea.Highlighter s m
     , predictionConfig : Maybe (Textarea.PredictionConfig p m)
     }
+
+
+type alias PredictionConfig p m =
+    Textarea.PredictionConfig p m
 
 
 view : ViewConfig s p m -> Model s p -> Html.Html m
@@ -67,20 +80,25 @@ view config model =
 
 
 type alias UpdateConfig s p m =
-    { lift : Msg s m -> m
-    , highlighter : Textarea.Highlighter s m
-    , predictionConfig : Maybe (Textarea.PredictionConfig p m)
+    { lift : Msg s p m -> m
+    , predictionConfig : Maybe (PredictionConfig2 p m)
     , requestHighlight : ApplyStylesFun s m -> String -> m
     }
 
 
-update : UpdateConfig s p m -> Msg s m -> Model s p -> ( Model s p, Cmd m )
+type alias PredictionConfig2 p m =
+    { config : Textarea.PredictionConfig p m
+    , requestPrediction : ApplyPredictionsFun p m -> ( String, Int ) -> m
+    }
+
+
+update : UpdateConfig s p m -> Msg s p m -> Model s p -> ( Model s p, Cmd m )
 update config msg model =
     let
         config_ =
             { lift = config.lift << LiftMsg
             , highlighter = always [] -- TODO remove from Textarea.Config for update
-            , predictionConfig = config.predictionConfig
+            , predictionConfig = Maybe.map .config config.predictionConfig
             }
     in
     case msg of
@@ -102,6 +120,11 @@ update config msg model =
                             hr.text
                                 |> Task.succeed
                                 |> Task.perform requestHighlight
+
+                        Just (Textarea.RequestPrediction pr) ->
+                            config.predictionConfig
+                                |> Maybe.map (requestPredictionCmd config.lift pr)
+                                |> Maybe.withDefault Cmd.none
 
                         _ ->
                             Cmd.none
@@ -125,8 +148,29 @@ update config msg model =
             , Cmd.none
             )
 
+        ApplyPredictions id predictions ->
+            Textarea.applyPredictions
+                config_
+                { id = id, predictions = predictions }
+                model
+                |> Tuple.mapSecond (Cmd.map (config.lift << LiftMsg))
 
-subscriptions : Model s m -> Sub (Msg s m)
+
+requestPredictionCmd : (Msg s p m -> m) -> Textarea.PredictionRequest -> PredictionConfig2 p m -> Cmd m
+requestPredictionCmd lift pr config =
+    let
+        applyPredictions =
+            lift << ApplyPredictions pr.id
+
+        requestPrediction =
+            config.requestPrediction applyPredictions
+    in
+    ( pr.text, pr.offset )
+        |> Task.succeed
+        |> Task.perform requestPrediction
+
+
+subscriptions : Model s p -> Sub (Msg s p m)
 subscriptions model =
     Sub.map LiftMsg <| Textarea.subscriptions model
 
@@ -144,3 +188,8 @@ stylesDecoder styleDecoder =
                 (D.field "style" styleDecoder)
     in
     D.list rangeAndStyleDecoder
+
+
+predictionsDecoder : D.Decoder p -> D.Decoder (List p)
+predictionsDecoder predictionDecoder =
+    D.list predictionDecoder
