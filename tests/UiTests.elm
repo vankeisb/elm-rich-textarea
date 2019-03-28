@@ -130,7 +130,7 @@ suite =
         ]
 
 
-config: Config MyStyle () Msg
+config : Config MyStyle () Msg
 config =
     { lift = TextareaMsg
     , highlighter = emptyHighlighter
@@ -141,10 +141,12 @@ config =
 update : IT.Msg -> Model MyStyle () -> Model MyStyle ()
 update msg model =
     let
-        (m,_,_) =
+        ( m, _, _ ) =
             Textarea.update config msg model
     in
     m
+
+
 
 --updateNoHl =
 --    update emptyHighlighter
@@ -182,7 +184,6 @@ createModel str =
         , debounceMs = 1000
         }
         |> Tuple.first
-
 
 
 withSelection : Range -> Model s () -> Model s ()
@@ -262,6 +263,13 @@ updateSuite =
                         |> withSelection (range 3 3)
                         |> whileSelectingAt 3
                         |> update (IT.MouseOverLine 0)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 3 3)
+            , test "blur keeps selection" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> withSelection (range 3 3)
+                        |> update IT.Blurred
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
             ]
