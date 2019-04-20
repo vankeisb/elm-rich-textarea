@@ -126,6 +126,20 @@ suite =
                         |> update (IT.MouseOverLine 0)
                         |> renderHtml
                         |> expectSelectedText "nu"
+            , test "expand to right" <|
+                \_ ->
+                    createModel "gnu\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 5)
+                        |> renderHtml
+                        |> expectSelectedText "a"
+            , test "expand to left" <|
+                \_ ->
+                    createModel "gnu\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 4)
+                        |> renderHtml
+                        |> expectSelectedText "ba"
             ]
         ]
 
@@ -272,6 +286,20 @@ updateSuite =
                         |> update IT.Blurred
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
+            , test "expand to right" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 5)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 5 6)
+            , test "expand to left" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 4)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 4 5)
             ]
         ]
 
