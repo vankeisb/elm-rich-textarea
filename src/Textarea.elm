@@ -277,7 +277,6 @@ view config (Model d) =
             , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
             , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , mouseEvent "mouseleave" (\_ -> lift <| BackgroundMouseLeft)
-            , mouseEnterEvent (\buttons -> lift <| BackgroundMouseEnter buttons)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -517,6 +516,9 @@ renderStyledText m lift highlighter st =
               , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
               , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
               ]
+                ++ (mouseMoveEvent m.selectingAt selRange (from + i) MouseMove
+                        |> List.map (Html.Attributes.map lift)
+                   )
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]
 
@@ -668,6 +670,12 @@ update config msg (Model model) =
                 |> updateIfSelecting (expandSelection i)
                 |> noOut
 
+        MouseMove i ->
+            Model model
+                |> noCmd
+                |> updateIfSelecting (expandSelection i)
+                |> noOut
+
         MouseClicks i count ->
             if count == 1.0 then
                 Model model
@@ -751,18 +759,6 @@ update config msg (Model model) =
                 |> setSelectingAt Nothing
                 |> noCmd
                 |> noOut
-
-        BackgroundMouseEnter buttons ->
-            if 1 == buttons then
-                Model model
-                    |> setSelectingAt (Just 0)
-                    |> noCmd
-                    |> noOut
-
-            else
-                Model model
-                    |> noCmd
-                    |> noOut
 
         Focused (Ok ()) ->
             Model
@@ -1440,6 +1436,52 @@ mouseEvent name createMsg =
             (Json.at [ "target", "clientWidth" ] Json.int)
 
 
+mouseMoveEvent : Maybe Int -> Maybe Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveEvent selectingAt selection pos msg =
+    Maybe.map2
+        (\_ sel -> mouseMoveEvent_ sel pos msg)
+        selectingAt
+        selection
+        |> Maybe.withDefault []
+
+
+mouseMoveEvent_ : Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveEvent_ selection pos createMsg =
+    let
+        ( from, to ) =
+            Range.getBounds selection
+    in
+    if pos == from - 1 then
+        mouseMoveEvent__ 0 (createMsg pos)
+
+    else if pos == to then
+        mouseMoveEvent__ 1 (createMsg (pos + 1))
+
+    else
+        []
+
+
+mouseMoveEvent__ : Int -> Msg -> List (Attribute Msg)
+mouseMoveEvent__ onAdjust msg =
+    [ custom "mousemove" <|
+        Json.map2
+            (\offsetX w ->
+                { message =
+                    if adjustIndex offsetX w == onAdjust then
+                        msg
+
+                    else
+                        NoOp
+                , preventDefault = True
+                , stopPropagation = True
+                }
+                    |> Debug.log ("FW " ++ Debug.toString offsetX ++ "|" ++ Debug.toString w)
+            )
+            (Json.at [ "offsetX" ] Json.float)
+            (Json.at [ "target", "clientWidth" ] Json.int)
+    ]
+
+
 mouseEnterEvent : (Int -> msg) -> Attribute msg
 mouseEnterEvent createMsg =
     custom "mouseenter" <|
@@ -1476,7 +1518,7 @@ mouseClickEvent createMsg =
 
 adjustIndex : Float -> Int -> Int
 adjustIndex offsetX clientWidth =
-    if offsetX >= (toFloat clientWidth * 0.5) then
+    if truncate offsetX >= clientWidth // 2 then
         1
 
     else
