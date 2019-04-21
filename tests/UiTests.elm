@@ -130,7 +130,7 @@ suite =
                 \_ ->
                     createModel "gnu\nbar\nbaz"
                         |> whileSelectingAt 5
-                        |> update (IT.MouseOver 5)
+                        |> update (IT.MouseOver 6)
                         |> renderHtml
                         |> expectSelectedText "a"
             , test "expand to left" <|
@@ -139,7 +139,7 @@ suite =
                         |> whileSelectingAt 5
                         |> update (IT.MouseOver 4)
                         |> renderHtml
-                        |> expectSelectedText "ba"
+                        |> expectSelectedText "b"
             ]
         ]
 
@@ -290,7 +290,7 @@ updateSuite =
                 \_ ->
                     createModel "foo\nbar\nbaz"
                         |> whileSelectingAt 5
-                        |> update (IT.MouseOver 5)
+                        |> update (IT.MouseOver 6)
                         |> getSelection
                         |> Expect.equal (Just <| range 5 6)
             , test "expand to left" <|
