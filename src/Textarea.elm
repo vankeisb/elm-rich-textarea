@@ -516,7 +516,7 @@ renderStyledText m lift highlighter st =
               , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
               , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
               ]
-                ++ (mouseMoveEvent m.selectingAt selRange (from + i) MouseMove
+                ++ (mouseMoveAtSelectionBoundary m.selectingAt selRange (from + i) MouseMoveExpand
                         |> List.map (Html.Attributes.map lift)
                    )
                 ++ (if isSelected then
@@ -670,7 +670,7 @@ update config msg (Model model) =
                 |> updateIfSelecting (expandSelection i)
                 |> noOut
 
-        MouseMove i ->
+        MouseMoveExpand i ->
             Model model
                 |> noCmd
                 |> updateIfSelecting (expandSelection i)
@@ -1436,33 +1436,33 @@ mouseEvent name createMsg =
             (Json.at [ "target", "clientWidth" ] Json.int)
 
 
-mouseMoveEvent : Maybe Int -> Maybe Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
-mouseMoveEvent selectingAt selection pos msg =
+mouseMoveAtSelectionBoundary : Maybe Int -> Maybe Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveAtSelectionBoundary selectingAt selection pos msg =
     Maybe.map2
-        (\_ sel -> mouseMoveEvent_ sel pos msg)
+        (\_ sel -> mouseMoveAtSelectionBoundary_ sel pos msg)
         selectingAt
         selection
         |> Maybe.withDefault []
 
 
-mouseMoveEvent_ : Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
-mouseMoveEvent_ selection pos createMsg =
+mouseMoveAtSelectionBoundary_ : Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveAtSelectionBoundary_ selection pos createMsg =
     let
         ( from, to ) =
             Range.getBounds selection
     in
     if pos == from - 1 then
-        mouseMoveEvent__ 0 (createMsg pos)
+        mouseMoveAtBoundary 0 (createMsg pos)
 
     else if pos == to then
-        mouseMoveEvent__ 1 (createMsg (pos + 1))
+        mouseMoveAtBoundary 1 (createMsg (pos + 1))
 
     else
         []
 
 
-mouseMoveEvent__ : Int -> Msg -> List (Attribute Msg)
-mouseMoveEvent__ onAdjust msg =
+mouseMoveAtBoundary : Int -> Msg -> List (Attribute Msg)
+mouseMoveAtBoundary onAdjust msg =
     [ custom "mousemove" <|
         Json.map2
             (\offsetX w ->

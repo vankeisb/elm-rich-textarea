@@ -28,7 +28,7 @@ type Msg
     | MouseDown Int
     | MouseUp Int
     | MouseOver Int
-    | MouseMove Int
+    | MouseMoveExpand Int
     | MouseDownLine Int
     | MouseOverLine Int
     | MouseUpLine Int

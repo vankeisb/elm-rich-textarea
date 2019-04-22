@@ -162,7 +162,7 @@ suite =
                             [ attribute <| A.attribute "data-from" "5"
                             ]
                         |> E.simulate (E.custom "mousemove" simulatedEvent)
-                        |> E.expect (TextareaMsg <| IT.MouseMove 6)
+                        |> E.expect (TextareaMsg <| IT.MouseMoveExpand 6)
             , test "expand not yet to the right" <|
                 \_ ->
                     let
@@ -204,7 +204,7 @@ suite =
                             [ attribute <| A.attribute "data-from" "4"
                             ]
                         |> E.simulate (E.custom "mousemove" simulatedEvent)
-                        |> E.expect (TextareaMsg <| IT.MouseMove 4)
+                        |> E.expect (TextareaMsg <| IT.MouseMoveExpand 4)
             , test "expand to not yet the left" <|
                 \_ ->
                     let
