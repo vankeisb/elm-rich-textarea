@@ -141,6 +141,92 @@ suite =
                         |> renderHtml
                         |> expectSelectedText "b"
             ]
+        , describe "mouse selection at selection boundary"
+            [ test "expand to the right" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 6 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "5"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.MouseMove 6)
+            , test "expand not yet to the right" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 4 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "5"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.NoOp)
+            , test "expand to the left" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 4 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "4"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.MouseMove 4)
+            , test "expand to not yet the left" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 6 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "4"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.NoOp)
+            ]
         ]
 
 

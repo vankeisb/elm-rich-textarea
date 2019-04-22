@@ -1475,24 +1475,10 @@ mouseMoveEvent__ onAdjust msg =
                 , preventDefault = True
                 , stopPropagation = True
                 }
-                    |> Debug.log ("FW " ++ Debug.toString offsetX ++ "|" ++ Debug.toString w)
             )
             (Json.at [ "offsetX" ] Json.float)
             (Json.at [ "target", "clientWidth" ] Json.int)
     ]
-
-
-mouseEnterEvent : (Int -> msg) -> Attribute msg
-mouseEnterEvent createMsg =
-    custom "mouseenter" <|
-        Json.map
-            (\buttons ->
-                { message = createMsg buttons
-                , preventDefault = True
-                , stopPropagation = True
-                }
-            )
-            (Json.at [ "buttons" ] Json.int)
 
 
 mouseClickEvent : (Int -> Float -> msg) -> Attribute msg
