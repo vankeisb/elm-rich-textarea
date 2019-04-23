@@ -277,7 +277,6 @@ view config (Model d) =
             , mouseEvent "mouseover" (\_ -> lift <| BackgroundMouseOver)
             , mouseEvent "mouseup" (\_ -> lift <| BackgroundMouseUp)
             , mouseEvent "mouseleave" (\_ -> lift <| BackgroundMouseLeft)
-            , mouseEnterEvent (\buttons -> lift <| BackgroundMouseEnter buttons)
             , on "scroll" <|
                 Json.map2
                     (\left top ->
@@ -517,6 +516,9 @@ renderStyledText m lift highlighter st =
               , mouseEvent "mouseup" (\adjust -> lift <| MouseUp <| from + i + adjust)
               , mouseClickEvent (\adjust count -> lift <| MouseClicks (from + i + adjust) count)
               ]
+                ++ (mouseMoveAtSelectionBoundary m.selectingAt selRange (from + i) MouseMoveExpand
+                        |> List.map (Html.Attributes.map lift)
+                   )
                 ++ (if isSelected then
                         [ style "background-color" "lightblue" ]
 
@@ -674,6 +676,12 @@ update config msg (Model model) =
                 |> updateIfSelecting (expandSelection i)
                 |> noOut
 
+        MouseMoveExpand i ->
+            Model model
+                |> noCmd
+                |> updateIfSelecting (expandSelection i)
+                |> noOut
+
         MouseClicks i count ->
             if count == 1.0 then
                 Model model
@@ -758,18 +766,6 @@ update config msg (Model model) =
                 |> noCmd
                 |> noOut
 
-        BackgroundMouseEnter buttons ->
-            if 1 == buttons then
-                Model model
-                    |> setSelectingAt (Just 0)
-                    |> noCmd
-                    |> noOut
-
-            else
-                Model model
-                    |> noCmd
-                    |> noOut
-
         Focused (Ok ()) ->
             Model
                 { model
@@ -792,7 +788,6 @@ update config msg (Model model) =
                 }
                 |> setSelectingAt Nothing
                 |> noCmd
-                |> setSelection Nothing
                 |> noOut
 
         GetViewportPos element ->
@@ -1444,17 +1439,49 @@ mouseEvent name createMsg =
             (Json.at [ "target", "clientWidth" ] Json.int)
 
 
-mouseEnterEvent : (Int -> msg) -> Attribute msg
-mouseEnterEvent createMsg =
-    custom "mouseenter" <|
-        Json.map
-            (\buttons ->
-                { message = createMsg buttons
+mouseMoveAtSelectionBoundary : Maybe Int -> Maybe Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveAtSelectionBoundary selectingAt selection pos msg =
+    Maybe.map2
+        (\_ sel -> mouseMoveAtSelectionBoundary_ sel pos msg)
+        selectingAt
+        selection
+        |> Maybe.withDefault []
+
+
+mouseMoveAtSelectionBoundary_ : Range -> Int -> (Int -> Msg) -> List (Attribute Msg)
+mouseMoveAtSelectionBoundary_ selection pos createMsg =
+    let
+        ( from, to ) =
+            Range.getBounds selection
+    in
+    if pos == from - 1 then
+        mouseMoveAtBoundary 0 (createMsg pos)
+
+    else if pos == to then
+        mouseMoveAtBoundary 1 (createMsg (pos + 1))
+
+    else
+        []
+
+
+mouseMoveAtBoundary : Int -> Msg -> List (Attribute Msg)
+mouseMoveAtBoundary onAdjust msg =
+    [ custom "mousemove" <|
+        Json.map2
+            (\offsetX w ->
+                { message =
+                    if adjustIndex offsetX w == onAdjust then
+                        msg
+
+                    else
+                        NoOp
                 , preventDefault = True
                 , stopPropagation = True
                 }
             )
-            (Json.at [ "buttons" ] Json.int)
+            (Json.at [ "offsetX" ] Json.float)
+            (Json.at [ "target", "clientWidth" ] Json.int)
+    ]
 
 
 mouseClickEvent : (Int -> Float -> msg) -> Attribute msg
@@ -1480,7 +1507,7 @@ mouseClickEvent createMsg =
 
 adjustIndex : Float -> Int -> Int
 adjustIndex offsetX clientWidth =
-    if offsetX >= (toFloat clientWidth * 0.5) then
+    if truncate offsetX >= clientWidth // 2 then
         1
 
     else
