@@ -126,11 +126,111 @@ suite =
                         |> update (IT.MouseOverLine 0)
                         |> renderHtml
                         |> expectSelectedText "nu"
+            , test "expand to right" <|
+                \_ ->
+                    createModel "gnu\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 6)
+                        |> renderHtml
+                        |> expectSelectedText "a"
+            , test "expand to left" <|
+                \_ ->
+                    createModel "gnu\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 4)
+                        |> renderHtml
+                        |> expectSelectedText "b"
+            ]
+        , describe "mouse selection at selection boundary"
+            [ test "expand to the right" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 6 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "5"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.MouseMoveExpand 6)
+            , test "expand not yet to the right" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 4 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "5"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.NoOp)
+            , test "expand to the left" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 4 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "4"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.MouseMoveExpand 4)
+            , test "expand to not yet the left" <|
+                \_ ->
+                    let
+                        simulatedEvent =
+                            Encode.object
+                                [ ( "offsetX", Encode.float 6 )
+                                , ( "target"
+                                  , Encode.object
+                                        [ ( "clientWidth", Encode.int 10 ) ]
+                                  )
+                                ]
+                    in
+                    createModel "gnu\nbar\nbaz"
+                        |> withSelection (range 5 5)
+                        |> whileSelectingAt 5
+                        |> renderHtml
+                        |> find
+                            [ attribute <| A.attribute "data-from" "4"
+                            ]
+                        |> E.simulate (E.custom "mousemove" simulatedEvent)
+                        |> E.expect (TextareaMsg <| IT.NoOp)
             ]
         ]
 
 
-config: Config MyStyle () Msg
+config : Config MyStyle () Msg
 config =
     { lift = TextareaMsg
     , highlighter = emptyHighlighter
@@ -141,10 +241,12 @@ config =
 update : IT.Msg -> Model MyStyle () -> Model MyStyle ()
 update msg model =
     let
-        (m,_,_) =
+        ( m, _, _ ) =
             Textarea.update config msg model
     in
     m
+
+
 
 --updateNoHl =
 --    update emptyHighlighter
@@ -182,7 +284,6 @@ createModel str =
         , debounceMs = 1000
         }
         |> Tuple.first
-
 
 
 withSelection : Range -> Model s () -> Model s ()
@@ -264,6 +365,27 @@ updateSuite =
                         |> update (IT.MouseOverLine 0)
                         |> getSelection
                         |> Expect.equal (Just <| range 3 3)
+            , test "blur keeps selection" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> withSelection (range 3 3)
+                        |> update IT.Blurred
+                        |> getSelection
+                        |> Expect.equal (Just <| range 3 3)
+            , test "expand to right" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 6)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 5 6)
+            , test "expand to left" <|
+                \_ ->
+                    createModel "foo\nbar\nbaz"
+                        |> whileSelectingAt 5
+                        |> update (IT.MouseOver 4)
+                        |> getSelection
+                        |> Expect.equal (Just <| range 4 5)
             ]
         ]
 
