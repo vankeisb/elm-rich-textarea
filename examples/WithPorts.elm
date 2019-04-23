@@ -1,4 +1,4 @@
-port module WithPorts exposing (..)
+port module WithPorts exposing (Model, Msg(..), MyPrediction, MyStyle(..), config, highlight, highlighter, init, myStyleDecoder, onHighlightResponse, onPredictResponse, predict, subscriptions, update, view)
 
 import Browser
 import Html exposing (..)
@@ -11,9 +11,12 @@ import Range exposing (Range)
 import Task
 import Textarea
 
+
+
 {-
-    Using the textarea with ports
+   Using the textarea with ports
 -}
+
 
 type Msg
     = TextareaMsg Textarea.Msg
@@ -22,23 +25,30 @@ type Msg
     | OnPredictResult D.Value
 
 
+
 {-
-    Custom user styles
+   Custom user styles
 -}
+
+
 type MyStyle
     = Keyword
     | Identifier
 
 
-type alias MyPrediction = String
+type alias MyPrediction =
+    String
+
 
 
 {-
-    Your Model should keep the textarea's Model, that's parent/child...
+   Your Model should keep the textarea's Model, that's parent/child...
 -}
+
+
 type alias Model =
     { textareaModel : Textarea.Model MyStyle MyPrediction
-    , blah: String
+    , blah : String
     }
 
 
@@ -52,13 +62,13 @@ init idPrefix =
                     "let\n  foo = 1\nin\n  foo + bar"
     in
     ( { textareaModel = m
-        , blah = ""
+      , blah = ""
       }
     , Cmd.map TextareaMsg c
     )
 
 
-config: Textarea.Config MyStyle MyPrediction Msg
+config : Textarea.Config MyStyle MyPrediction Msg
 config =
     { lift = TextareaMsg
     , highlighter = highlighter
@@ -69,11 +79,11 @@ config =
                 \pred ->
                     if pred == "foo" || pred == "bar" then
                         Just <| text "λ"
+
                     else
                         Nothing
             }
     }
-
 
 
 view : Model -> Html Msg
@@ -82,7 +92,7 @@ view model =
         []
         [ h2
             []
-            [ text "Highlighting/Predictions in JS"]
+            [ text "Highlighting/Predictions in JS" ]
         , div
             [ style "width" "400px"
             , style "height" "200px"
@@ -159,14 +169,13 @@ update msg model =
             in
             case hlr of
                 Ok highlightResponse ->
-                    (
-                        { model
-                            | textareaModel =
-                                Textarea.applyStyles
-                                    highlightResponse.id
-                                    highlightResponse.styles
-                                    model.textareaModel
-                        }
+                    ( { model
+                        | textareaModel =
+                            Textarea.applyStyles
+                                highlightResponse.id
+                                highlightResponse.styles
+                                model.textareaModel
+                      }
                     , Cmd.none
                     )
 
@@ -175,8 +184,7 @@ update msg model =
                         x =
                             Debug.log "failed to decode highlight response" (Debug.toString e)
                     in
-                    (model, Cmd.none)
-
+                    ( model, Cmd.none )
 
         OnPredictResult v ->
             let
@@ -185,20 +193,19 @@ update msg model =
                         (Textarea.predictResponseDecoder D.string)
                         v
             in
-            case Debug.log "pr" pr of
+            case pr of
                 Ok predictResponse ->
                     let
-                        (tm, tc) =
+                        ( tm, tc ) =
                             Textarea.applyPredictions
                                 config
                                 predictResponse
                                 model.textareaModel
                     in
-                    (
-                        { model
-                            | textareaModel =
-                                tm
-                        }
+                    ( { model
+                        | textareaModel =
+                            tm
+                      }
                     , Cmd.map TextareaMsg tc
                     )
 
@@ -207,30 +214,31 @@ update msg model =
                         x =
                             Debug.log "failed to decode prediction response" (Debug.toString e)
                     in
-                    (model, Cmd.none)
-
+                    ( model, Cmd.none )
 
         TextClicked ->
             ( model, Cmd.none )
 
 
+
 {-
-    Ports used for parsing with JS
+   Ports used for parsing with JS
 -}
 
-port highlight: E.Value -> Cmd m
+
+port highlight : E.Value -> Cmd m
 
 
-port onHighlightResponse: (D.Value -> m) -> Sub m
+port onHighlightResponse : (D.Value -> m) -> Sub m
 
 
-port predict: E.Value -> Cmd m
+port predict : E.Value -> Cmd m
 
 
-port onPredictResponse: (D.Value -> m) -> Sub m
+port onPredictResponse : (D.Value -> m) -> Sub m
 
 
-myStyleDecoder: D.Decoder MyStyle
+myStyleDecoder : D.Decoder MyStyle
 myStyleDecoder =
     D.string
         |> D.andThen
@@ -246,9 +254,12 @@ myStyleDecoder =
                         D.fail <| "Unknown style " ++ unknownStyle
             )
 
+
+
 {-
-    Subs
+   Subs
 -}
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -257,4 +268,3 @@ subscriptions model =
         , onHighlightResponse OnParseResult
         , onPredictResponse OnPredictResult
         ]
-

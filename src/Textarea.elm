@@ -335,7 +335,7 @@ view config (Model d) =
                         (\keyCode ctrlKey start end ->
                             let
                                 stopEvt =
-                                    if Debug.log "kc" keyCode == 9 then
+                                    if keyCode == 9 then
                                         -- stop tab
                                         True
 
@@ -636,9 +636,8 @@ update config msg (Model model) =
                                 start - prevStart
 
                             insertedNonWhitespace =
-                                Debug.log "FW" <|
-                                    countLeadingNonWhitespace <|
-                                        String.slice prevStart start s
+                                countLeadingNonWhitespace <|
+                                    String.slice prevStart start s
                         in
                         if start == end && inserted /= 0 then
                             model.styles
@@ -1114,7 +1113,7 @@ onKey : Config s p m -> Bool -> Int -> Bool -> Int -> Int -> ModelData s p -> ( 
 onKey config isDown keyCode ctrlKey start end d =
     let
         x =
-            Debug.log "startOnKey" start
+            start
 
         ( newText, newSel ) =
             if keyCode == 9 && not isDown then
@@ -1311,11 +1310,9 @@ insertPrediction predictionConfig pred appendSpaceAtEnd pd pos ( Model d, cmd ) 
 
         left =
             String.slice 0 pos d.text
-                |> Debug.log "left"
 
         right =
             String.slice pos (String.length d.text) d.text
-                |> Debug.log "right"
 
         newCaretPos =
             pos + String.length textToInsert
@@ -1326,7 +1323,6 @@ insertPrediction predictionConfig pred appendSpaceAtEnd pd pos ( Model d, cmd ) 
                 left
                     ++ textToInsert
                     ++ right
-                    |> Debug.log "newText"
             , predictions =
                 Closed
             , selection =
