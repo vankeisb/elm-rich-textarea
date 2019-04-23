@@ -1,5 +1,6 @@
 module Range exposing
     ( Range
+    , closeAt
     , contains
     , empty
     , expand
@@ -97,6 +98,15 @@ insertAt pos count (Range from to) =
 
     else if count < 0 && pos <= to - 1 then
         range from (to + count)
+
+    else
+        range from to
+
+
+closeAt : Int -> Range -> Range
+closeAt pos (Range from to) =
+    if contains pos (Range from to) then
+        range from pos
 
     else
         range from to

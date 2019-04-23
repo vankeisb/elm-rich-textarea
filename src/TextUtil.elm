@@ -1,4 +1,9 @@
-module TextUtil exposing (lineRangeAt, maybeOrElse, wordRangeAt)
+module TextUtil exposing
+    ( countLeadingNonWhitespace
+    , lineRangeAt
+    , maybeOrElse
+    , wordRangeAt
+    )
 
 import Range exposing (Range, range)
 
@@ -99,3 +104,19 @@ maxIndexWith pred list =
                     max
             )
             -1
+
+
+countLeadingNonWhitespace : String -> Int
+countLeadingNonWhitespace text =
+    text
+        |> String.toList
+        |> List.foldl
+            (\c ( count, done ) ->
+                if done || isWhitespace c then
+                    ( count, True )
+
+                else
+                    ( count + 1, False )
+            )
+            ( 0, False )
+        |> Tuple.first

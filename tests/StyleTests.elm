@@ -2,8 +2,8 @@ module StyleTests exposing (MyStyle(..), expectStylesAt, myStr, suite, testStyle
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
+import Internal.Styles as S exposing (StyledText, Styles, fromList, getStylesAt, insertAt)
 import Range exposing (Range, range)
-import Internal.Styles as S exposing (StyledText, Styles, getStylesAt)
 import Test exposing (..)
 
 
@@ -96,5 +96,53 @@ suite =
                             [ ( range 11 13, MyStyle1 ) ]
                             |> S.applyToText myStr 10
                         )
+            ]
+        , describe "modify styles"
+            [ describe "insert at"
+                [ test "nothing" <|
+                    \_ ->
+                        []
+                            |> S.fromList
+                            |> S.insertAt 0 1
+                            |> Expect.equal (S.fromList [])
+                , test "remove empty range" <|
+                    \_ ->
+                        [ ( Range.range 13 20, MyStyle1 ) ]
+                            |> S.fromList
+                            |> S.insertAt 13 -7
+                            |> Expect.equal (S.fromList [])
+                ]
+            , describe "end style at"
+                [ test "nothing" <|
+                    \_ ->
+                        []
+                            |> S.fromList
+                            |> S.endStyleAt 0
+                            |> Expect.equal (S.fromList [])
+                , test "before" <|
+                    \_ ->
+                        [ ( Range.range 13 20, MyStyle1 ) ]
+                            |> S.fromList
+                            |> S.endStyleAt 5
+                            |> Expect.equal (S.fromList [ ( Range.range 13 20, MyStyle1 ) ])
+                , test "after" <|
+                    \_ ->
+                        [ ( Range.range 13 20, MyStyle1 ) ]
+                            |> S.fromList
+                            |> S.endStyleAt 25
+                            |> Expect.equal (S.fromList [ ( Range.range 13 20, MyStyle1 ) ])
+                , test "inside" <|
+                    \_ ->
+                        [ ( Range.range 13 20, MyStyle1 ) ]
+                            |> S.fromList
+                            |> S.endStyleAt 16
+                            |> Expect.equal (S.fromList [ ( Range.range 13 16, MyStyle1 ) ])
+                , test "remove empty range" <|
+                    \_ ->
+                        [ ( Range.range 13 20, MyStyle1 ) ]
+                            |> S.fromList
+                            |> S.endStyleAt 13
+                            |> Expect.equal (S.fromList [])
+                ]
             ]
         ]

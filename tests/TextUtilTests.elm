@@ -3,7 +3,7 @@ module TextUtilTests exposing (suite)
 import Expect exposing (Expectation)
 import Range exposing (range)
 import Test exposing (..)
-import TextUtil exposing (lineRangeAt, maybeOrElse, wordRangeAt)
+import TextUtil exposing (countLeadingNonWhitespace, lineRangeAt, maybeOrElse, wordRangeAt)
 
 
 suite : Test
@@ -89,5 +89,22 @@ suite =
                     Nothing
                         |> maybeOrElse (Just 13)
                         |> Expect.equal (Just 13)
+            ]
+        , describe "non whitespace"
+            [ test "no whitespace" <|
+                \_ ->
+                    "text"
+                        |> countLeadingNonWhitespace
+                        |> Expect.equal 4
+            , test "whitespace" <|
+                \_ ->
+                    "text with whitespace"
+                        |> countLeadingNonWhitespace
+                        |> Expect.equal 4
+            , test "leading whitespace" <|
+                \_ ->
+                    " text after whitespace"
+                        |> countLeadingNonWhitespace
+                        |> Expect.equal 0
             ]
         ]

@@ -4,6 +4,7 @@ module Internal.Styles exposing
     , addStyles
     , applyToText
     , empty
+    , endStyleAt
     , fromList
     , getStylesAt
     , insertAt
@@ -117,5 +118,13 @@ insertAt : Int -> Int -> Styles s -> Styles s
 insertAt pos count (Styles styles) =
     styles
         |> List.map (Tuple.mapFirst (Range.insertAt pos count))
+        |> List.filter (not << Range.empty << Tuple.first)
+        |> Styles
+
+
+endStyleAt : Int -> Styles s -> Styles s
+endStyleAt pos (Styles styles) =
+    styles
+        |> List.map (Tuple.mapFirst (Range.closeAt pos))
         |> List.filter (not << Range.empty << Tuple.first)
         |> Styles
